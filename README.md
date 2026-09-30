@@ -35,18 +35,15 @@ Runs on an Arduino Nano, an ST Nucleo and an ESP32 DevKit from the same source.
 
 ## Installing
 
-Not in the Arduino Library Manager yet — see
-[CHANGELOG.md](CHANGELOG.md#publishing-to-the-arduino-library-manager) for what
-that takes. Until then, from
-[github.com/OnlyBauer/arduino_RcLights](https://github.com/OnlyBauer/arduino_RcLights):
-
-- **Arduino IDE**: download the repository as a ZIP and use *Sketch → Include
-  Library → Add .ZIP Library*.
-- **Anywhere else**: clone it into your sketchbook's `libraries/` folder.
+- **Arduino IDE**: *Sketch → Include Library → Manage Libraries*, search for
+  **RcLights**.
+- **arduino-cli**: `arduino-cli lib install RcLights`
 - **PlatformIO**: `lib_deps = https://github.com/OnlyBauer/arduino_RcLights.git`
 
-That GitHub repository is a read-only mirror; development is on the self-hosted
-GitLab, so issues and merge requests belong there.
+The source is at
+[github.com/OnlyBauer/arduino_RcLights](https://github.com/OnlyBauer/arduino_RcLights),
+which is a read-only mirror; development is on the self-hosted GitLab, so issues
+and merge requests belong there.
 
 ## Getting started
 

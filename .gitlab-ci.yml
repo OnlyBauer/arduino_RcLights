@@ -142,6 +142,11 @@ version-matches-tag:
 #
 # Left on submit after acceptance, LP017 fires against our own index entry.
 #
+# Switched to update when RcLights was accepted into the registry. Note that
+# LP018 fails until the index has actually been rebuilt with the new entry,
+# which takes up to a day after the registry's bot approves the submission; the
+# job goes green on its own once that happens.
+#
 # The job calls tools/ci.sh, which lints a copy of the tracked files rather than
 # the checkout: rule LS007 fails on any .exe, and build_tests/ is full of them
 # on a Windows machine.
@@ -149,7 +154,7 @@ arduino-lint:
   stage: lint
   image: debian:bookworm-slim
   variables:
-    LIBRARY_MANAGER_MODE: submit
+    LIBRARY_MANAGER_MODE: update
   before_script:
     - apt-get update -qq
     # git and tar: ci.sh copies the tracked files out with them.

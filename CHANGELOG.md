@@ -63,6 +63,10 @@ that, and both are enforced by CI before a tag can be made:
 - the tag has to be made from a commit whose `library.properties` is already
   correct, because that file is what gets indexed, not the release notes.
 
+RcLights was accepted into the registry at 0.1.0. What follows is the procedure
+that was used, kept because the next library needs it and because step 4 is the
+one nobody remembers.
+
 ### Getting listed the first time
 
 1. The repository has to be public and on a host the registry accepts: GitHub,
@@ -82,8 +86,8 @@ that, and both are enforced by CI before a tag can be made:
    comments; on success the library appears in the index within a day.
 4. **Then change `LIBRARY_MANAGER_MODE` in `.gitlab-ci.yml` from `submit` to
    `update`.** Left on `submit`, the job starts failing against the library's
-   own new index entry; the comment above that job explains what each mode
-   checks.
+   own new index entry. Expect `update` to fail with LP018 for up to a day
+   after that, until the index is rebuilt with the new entry; it clears itself.
 
 The name cannot be changed after acceptance — it is the identifier by which the
 library is installed and by which other libraries depend on it.

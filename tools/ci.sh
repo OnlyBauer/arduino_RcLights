@@ -208,7 +208,9 @@ stage_lint() {
 # build_tests/ are .exe files -- git-ignored, and invisible to the registry,
 # which judges a tag. Working-tree content, so uncommitted work is checked.
 #
-# LIBRARY_MANAGER_MODE mirrors the variable in .gitlab-ci.yml.
+# LIBRARY_MANAGER_MODE mirrors the variable in .gitlab-ci.yml and must hold the
+# same value: the two modes check opposite things, so a default of submit here
+# would fail on LP017 against our own index entry while CI passed.
 stage_arduino_lint() {
   banner "arduino-lint"
   if ! have arduino-lint; then
@@ -216,7 +218,7 @@ stage_arduino_lint() {
     return
   fi
 
-  mode=${LIBRARY_MANAGER_MODE:-submit}
+  mode=${LIBRARY_MANAGER_MODE:-update}
   name=$(sed -n 's/^name=//p' library.properties)
   if [ -z "$name" ]; then
     echo "  cannot read name= from library.properties"
