@@ -6,13 +6,13 @@
 #   tools/ci.sh lint tests       only those
 #   tools/ci.sh --strict         a missing tool is a failure, not a SKIP
 #
-# Stages: lint tests sanitize docs
+# Stages: lint arduino-lint tests sanitize docs
 #
 # .gitlab-ci.yml calls this rather than the tools directly. Two implementations
 # of the same check drift, and the one that drifts is always the one nobody runs.
 set -eu
 
-STAGES_ALL="lint tests sanitize docs"
+STAGES_ALL="lint arduino-lint tests sanitize docs"
 STRICT=0
 STAGES=""
 
@@ -217,6 +217,51 @@ stage_lint() {
   return $rc
 }
 
+# --- arduino-lint -------------------------------------------------------------
+
+# The Arduino library specification, checked with Arduino's own tool. This is
+# the check that decides whether the library can be published at all, so it is
+# worth having locally rather than only in the registry's pull request.
+#
+# It runs against a copy of the *tracked* files rather than against the working
+# tree, and that is the whole reason this stage exists as more than one line.
+# Rule LS007 fails on any .exe inside the library, because the Library Manager
+# indexer refuses one -- and on Windows the host test binaries in build_tests/
+# are .exe files. Linting the working tree therefore reports an error about
+# files that are git-ignored, have never been committed and will never reach the
+# registry. What the registry actually judges is a tag: tracked files and
+# nothing else, which is what gets copied here.
+#
+# Working-tree content of those files, not HEAD's, so that uncommitted work is
+# checked like it is by every other stage.
+#
+# LIBRARY_MANAGER_MODE mirrors the variable in .gitlab-ci.yml; see the comment
+# on that job for why the two modes are not interchangeable.
+stage_arduino_lint() {
+  banner "arduino-lint"
+  if ! have arduino-lint; then
+    skip "arduino-lint" "arduino-lint"
+    return
+  fi
+
+  mode=${LIBRARY_MANAGER_MODE:-submit}
+  name=$(sed -n 's/^name=//p' library.properties)
+  if [ -z "$name" ]; then
+    echo "  cannot read name= from library.properties"
+    return 1
+  fi
+
+  tmp=$(mktemp -d)
+  mkdir -p "$tmp/$name"
+  git ls-files -z | tar --null -T - -cf - | (cd "$tmp/$name" && tar -xf -)
+
+  echo "  checking the tracked files as $name/, library-manager=$mode"
+  rc_al=0
+  (cd "$tmp/$name" && arduino-lint --compliance strict --library-manager "$mode" --recursive) || rc_al=1
+  rm -rf "$tmp"
+  return $rc_al
+}
+
 # --- the rest -----------------------------------------------------------------
 
 stage_tests()    { banner "tests";    make -C tests; }
@@ -243,10 +288,11 @@ stage_docs()     {
 rc=0
 for s in $STAGES; do
   case "$s" in
-    lint)     stage_lint     || rc=1 ;;
-    tests)    stage_tests    || rc=1 ;;
-    sanitize) stage_sanitize || rc=1 ;;
-    docs)     stage_docs     || rc=1 ;;
+    lint)         stage_lint         || rc=1 ;;
+    arduino-lint) stage_arduino_lint || rc=1 ;;
+    tests)        stage_tests        || rc=1 ;;
+    sanitize)     stage_sanitize     || rc=1 ;;
+    docs)         stage_docs         || rc=1 ;;
     *) echo "unknown stage: $s" >&2; usage 2 ;;
   esac
 done

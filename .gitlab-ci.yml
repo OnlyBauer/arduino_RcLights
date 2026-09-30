@@ -162,6 +162,13 @@ version-matches-tag:
 #
 # A third value, false, disables both and was what this job used while
 # publication was not being sought.
+#
+# The job calls tools/ci.sh for the same reason the lint job does, and here it
+# buys something specific: ci.sh runs arduino-lint against a copy of the tracked
+# files rather than the checkout itself. Rule LS007 fails on any .exe in the
+# library, and on a developer's Windows machine build_tests/ is full of them --
+# git-ignored, never committed, invisible to the registry, and enough to make a
+# local run disagree with this one. See the stage in tools/ci.sh.
 arduino-lint:
   stage: lint
   image: debian:bookworm-slim
@@ -169,10 +176,11 @@ arduino-lint:
     LIBRARY_MANAGER_MODE: submit
   before_script:
     - apt-get update -qq
-    - apt-get install -y -qq --no-install-recommends curl ca-certificates
+    # git and tar: ci.sh copies the tracked files out with them.
+    - apt-get install -y -qq --no-install-recommends curl ca-certificates git tar
     - curl -fsSL https://raw.githubusercontent.com/arduino/arduino-lint/main/etc/install.sh | BINDIR=/usr/local/bin sh
   script:
-    - arduino-lint --compliance strict --library-manager "$LIBRARY_MANAGER_MODE" --recursive
+    - bash tools/ci.sh arduino-lint --strict
 
 # --- test ---------------------------------------------------------------------
 

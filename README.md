@@ -253,11 +253,12 @@ board is affected; Nucleo and ESP32 can attach an interrupt to any pin.
 The library needs nothing but a board core. To work on it:
 
 ```sh
-tools/ci.sh            # everything this machine can run
-tools/ci.sh lint       # formatting, clang-tidy, versions, example layout
-make -C tests          # the two host suites
-make -C tests sanitize # the same under ASan and UBSan
-doxygen Doxyfile       # API docs into docs/html; warnings are errors
+tools/ci.sh              # everything this machine can run
+tools/ci.sh lint         # formatting, clang-tidy, versions, example layout
+tools/ci.sh arduino-lint # the Arduino library specification, Arduino's own tool
+make -C tests            # the three host suites
+make -C tests sanitize   # the same under ASan and UBSan
+doxygen Doxyfile         # API docs into docs/html; warnings are errors
 ```
 
 `tools/ci.sh` is what `.gitlab-ci.yml` calls, so a green run here is a green
