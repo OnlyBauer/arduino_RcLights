@@ -15,6 +15,32 @@ All notable changes to this library, newest first. The format follows
 that and nothing else. The `version-matches-tag` CI job checks it against the tag
 and against `library.json` and the `Doxyfile`, which must agree.
 
+## The GitHub mirror
+
+Development happens on the self-hosted GitLab; the GitHub repository
+[OnlyBauer/arduino_RcLights](https://github.com/OnlyBauer/arduino_RcLights) is a
+**push mirror of it, and read-only**. Never commit there: a push mirror
+force-updates its target, so anything committed on GitHub is overwritten without
+warning on the next sync. It exists because the Arduino Library Manager needs a
+repository on a host it accepts, and because the registry indexes tags, which
+the mirror carries across.
+
+Set up in GitLab under *Settings → Repository → Mirroring repositories*:
+
+| Field | Value |
+| --- | --- |
+| Git repository URL | `https://<user>@github.com/OnlyBauer/arduino_RcLights.git` |
+| Mirror direction | Push |
+| Authentication method | Password |
+| Password | a GitHub personal access token with the `repo` scope |
+
+The username goes in the URL, the token in the password field. Leave *Keep
+divergent refs* off, so the mirror always matches this repository exactly.
+Mirroring runs on push and can be triggered by hand with *Update now*.
+
+Nothing in CI depends on the mirror, and nothing needs to be pushed to it by
+hand.
+
 ## Publishing to the Arduino Library Manager
 
 The registry indexes **tags**, and reads `library.properties` out of each one, so
@@ -30,10 +56,11 @@ that, and both are enforced by CI before a tag can be made:
 
 1. The repository has to be public and on a host the registry accepts: GitHub,
    GitLab or Bitbucket, with other hosts "considered on request". The
-   self-hosted instance this repository lives on is not one of them, so
-   publication needs a public mirror, and `url` in `library.properties` has to
-   point at that mirror — rule LP042 fails the submission if the URL is not
-   reachable.
+   self-hosted instance this repository is developed on is not one of them, so
+   it is mirrored to
+   [github.com/OnlyBauer/arduino_RcLights](https://github.com/OnlyBauer/arduino_RcLights),
+   and that is the URL to submit. `url` in `library.properties` points at the
+   mirror too, because rule LP042 fails the submission if it is not reachable.
 2. The `name` field must not already be in use in the index, case-insensitively.
    This is the usual reason a submission is turned away. The `arduino-lint` CI
    job checks it in `submit` mode (rule LP017), so it is answered here rather
