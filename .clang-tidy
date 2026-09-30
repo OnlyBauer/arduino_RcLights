@@ -37,7 +37,9 @@ Checks: >
   -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,
   -misc-include-cleaner,
   -misc-const-correctness,
-  -misc-use-anonymous-namespace
+  -misc-non-private-member-variables-in-classes,
+  -misc-use-anonymous-namespace,
+  -performance-enum-size
 
 WarningsAsErrors: '*'
 
@@ -94,8 +96,35 @@ HeaderFilterRegex: 'rclights_(core|config|board)\.h$|RcLights\.h$'
 #   C++-Eigenheit angepasst, die in keinem anderen Repository dieses Projekts
 #   existiert.
 #
+# misc-non-private-member-variables-in-classes
+#   Meldet RcLights::outputs, weil es öffentlich ist. Das ist die Schnittstelle
+#   und keine Nachlässigkeit: ein Sketch schreibt `lights.outputs = ...`, so wie
+#   er `lights.esc_mode = ...` schreibt. Der Unterschied ist nur, dass esc_mode
+#   aus rcl_config_t geerbt wird -- einer Struktur mit ausschließlich
+#   öffentlichen Feldern, die diese Prüfung deshalb ignoriert -- und outputs
+#   nicht, weil LED-Polarität eine Eigenschaft der Verdrahtung ist und keine des
+#   Reglers. Die Prüfung meldet also genau ein Feld einer Klasse, deren
+#   Konfigurationsfläche ohnehin vollständig öffentlich ist.
+#
 # misc-use-anonymous-namespace
 #   Verlangt anonyme Namensräume statt interner Verknüpfung über `static`.
 #   `static` für Datei-lokale Funktionen ist das Idiom in allen vier
 #   Repositories, von denen drei reines C sind, wo es anonyme Namensräume nicht
 #   gibt.
+#
+# performance-enum-size
+#   Schlägt für jede der acht Aufzählungen vor, ihren Basistyp auf uint8_t zu
+#   verkleinern. Der Vorschlag lässt sich hier nicht umsetzen: rclights_core.h
+#   ist ein C11-Header, und die Syntax `enum x : uint8_t` gibt es in C erst seit
+#   C23. Sieben der acht Aufzählungen stehen dort. Die achte (RcLightsOutputs,
+#   C++) allein umzustellen würde die Prüfung nicht beruhigen und die beiden
+#   Hälften der Bibliothek uneinheitlich machen.
+#
+#   Der Ertrag wäre ohnehin gering, auf dem knappsten Ziel sogar null: avr-gcc
+#   übersetzt mit -fshort-enums als Voreinstellung, dort ist jede dieser
+#   Aufzählungen bereits ein Byte groß. Auf ESP32 und STM32 sind es vier, und
+#   dort ist Arbeitsspeicher kein Engpass.
+#
+#   Zu beachten, falls das je wieder aufkommt: die Größe der Aufzählungen geht
+#   in sizeof(rcl_config_t) ein, und tests/test_example_defaults.cpp prüft die
+#   gegen einen festen Wert.

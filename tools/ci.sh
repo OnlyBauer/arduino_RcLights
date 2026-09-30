@@ -141,11 +141,29 @@ lint_examples() {
 # The command is echoed as well, so that a failure here can be re-run by hand
 # without reading this script first.
 #
+# The header filter is passed explicitly rather than left to the
+# HeaderFilterRegex in .clang-tidy. Both should mean the same thing, and in CI
+# they do; under the clang-tidy build used on the development machine the value
+# from the configuration file is loaded -- `clang-tidy --dump-config` prints it
+# -- and then not applied, so every finding in this library's own headers was
+# invisible locally and fired only in CI. Passing it on the command line makes
+# the two agree whatever the local build does. The value still lives in
+# .clang-tidy, so editors and IDE integrations keep using it, and this reads it
+# from there rather than holding a second copy to drift.
+tidy_header_filter() {
+  hf=$(sed -n "s/^HeaderFilterRegex:[[:space:]]*'\(.*\)'[[:space:]]*$/\1/p" .clang-tidy)
+  if [ -z "$hf" ]; then
+    echo "  cannot read HeaderFilterRegex from .clang-tidy" >&2
+    return 1
+  fi
+  printf '%s' "$hf"
+}
+
 # $1 is the file, everything after it is passed to the compiler.
 tidy() {
   f=$1
   shift
-  if out=$(clang-tidy --quiet "$f" -- "$@" 2>&1); then
+  if out=$(clang-tidy --quiet --header-filter="$HEADER_FILTER" "$f" -- "$@" 2>&1); then
     return 0
   fi
   echo "  clang-tidy is unhappy with $f"
@@ -179,6 +197,8 @@ stage_lint() {
 
   banner "lint: clang-tidy"
   if have clang-tidy; then
+    HEADER_FILTER=$(tidy_header_filter) || return 1
+    echo "  header filter: $HEADER_FILTER"
     # The core as C, the wrapper and the mock runtime as C++ -- the same split
     # the Arduino build and tests/Makefile use. Checking the core as C++ would
     # report C idioms that do not apply to it.
