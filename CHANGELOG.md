@@ -29,14 +29,25 @@ Set up in GitLab under *Settings → Repository → Mirroring repositories*:
 
 | Field | Value |
 | --- | --- |
-| Git repository URL | `https://<user>@github.com/OnlyBauer/arduino_RcLights.git` |
+| Git repository URL | `https://github.com/OnlyBauer/arduino_RcLights.git` |
 | Mirror direction | Push |
 | Authentication method | Password |
-| Password | a GitHub personal access token with the `repo` scope |
+| Username | the GitHub account name |
+| Password | a GitHub personal access token |
 
-The username goes in the URL, the token in the password field. Leave *Keep
-divergent refs* off, so the mirror always matches this repository exactly.
-Mirroring runs on push and can be triggered by hand with *Update now*.
+The token needs read and write permission for repository contents — a
+fine-grained token scoped to this one repository is enough, as is a classic
+token with `repo`. Older GitLab versions take the username embedded in the URL
+(`https://user@github.com/...`) instead of in its own field.
+
+Leave *Keep divergent refs* off, so the mirror always matches this repository
+exactly. Mirroring runs on push and can be triggered by hand with *Update now*.
+Push mirroring is a free-tier feature; nothing here needs Premium.
+
+One thing to check the first time a release is tagged: GitLab's documentation
+describes branch mirroring and does not spell out tags, and the registry indexes
+tags and nothing else. So after the first `release_*` tag, confirm it actually
+appears under *Tags* on GitHub before submitting.
 
 Nothing in CI depends on the mirror, and nothing needs to be pushed to it by
 hand.
