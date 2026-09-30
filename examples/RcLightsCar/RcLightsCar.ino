@@ -35,25 +35,24 @@
  */
 
 /**
- * @brief RCLIGHTS_OUTPUTS_ACTIVE_HIGH if your LEDs go from the pin to ground,
- *        RCLIGHTS_OUTPUTS_ACTIVE_LOW if they go from the supply rail to the
- *        pin.
- */
-#define OUTPUTS RCLIGHTS_OUTPUTS_ACTIVE_HIGH
+  * @brief LEDS_ACTIVE_HIGH if your LEDs go from the pin to ground,
+  *        LEDS_ACTIVE_LOW if they go from the supply rail to the pin.
+  */
+#define OUTPUTS LEDS_ACTIVE_HIGH
 
 /**
- * @brief RCL_ESC_BRAKE_THEN_REVERSE if a backwards stick brakes and reverse
- *        needs neutral first, RCL_ESC_DIRECT_REVERSE if it reverses straight
- *        out of the brake.
- */
-#define ESC_MODE RCL_ESC_BRAKE_THEN_REVERSE
+  * @brief ESC_BRAKE_THEN_REVERSE if a backwards stick brakes and reverse needs
+  *        neutral first, ESC_DIRECT_REVERSE if it reverses straight out of the
+  *        brake.
+  */
+#define ESC_MODE ESC_BRAKE_THEN_REVERSE
 
 /**
- * @brief RCL_AUX_MODE_3POS for a three-position switch (middle = aux,
- *        up = hazards), RCL_AUX_MODE_2POS for a toggle (up = hazards),
- *        RCL_AUX_MODE_OFF if you have no third channel.
- */
-#define CH3_MODE RCL_AUX_MODE_3POS
+  * @brief SWITCH_3POS for a three-position switch (middle = aux, up = hazards),
+  *        SWITCH_2POS for a toggle (up = hazards), SWITCH_NONE if you have no
+  *        third channel.
+  */
+#define CH3_MODE SWITCH_3POS
 
 /** @brief The controller. */
 RcLights lights;
@@ -105,9 +104,9 @@ void setup()
 
     /* Channel 3. What the switch does in its low, middle and high position;
      * the middle one is unused on a two-position switch. */
-    lights.aux_action[0] = RCL_AUX_ACTION_NONE;
-    lights.aux_action[1] = RCL_AUX_ACTION_AUX;
-    lights.aux_action[2] = RCL_AUX_ACTION_HAZARD;
+    lights.aux_action[0] = ACTION_NOTHING;
+    lights.aux_action[1] = ACTION_AUX;
+    lights.aux_action[2] = ACTION_HAZARDS;
     lights.aux_low = -300; /* below this is the low position */
     lights.aux_high = 300; /* above this is the high position */
 

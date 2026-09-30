@@ -90,7 +90,49 @@ library is installed and by which other libraries depend on it.
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- **Short spellings of the constants a sketch types**, in `RcLights.h`:
+  `LEDS_ACTIVE_HIGH` / `LEDS_ACTIVE_LOW`, `ESC_BRAKE_THEN_REVERSE` /
+  `ESC_DIRECT_REVERSE`, `SWITCH_NONE` / `SWITCH_2POS` / `SWITCH_3POS`, and
+  `ACTION_NOTHING` / `ACTION_HAZARDS` / `ACTION_AUX` / `ACTION_LIGHTS_OFF`. The
+  Arduino style guide asks for this — *"LONG_CONSTANT_NAMES_FULL_OF_CAPS are
+  hard to read"* — and `RCL_AUX_ACTION_LIGHTS_OFF` was twenty-five characters of
+  which the first fifteen said nothing to the person typing it.
+
+  The long names are **not** deprecated and will not be removed: they are the C
+  core's, where a prefix is the only namespace available, and any sketch or port
+  using them keeps working. `tests/test_arduino_port.cpp` checks every alias
+  against the value it aliases, because an alias pointing at the wrong constant
+  is a bug no reader could see.
+
+- `RcLights::centering()`, reporting whether the automatic stick centring is
+  still running. It exists so that a sketch never has to write
+  `rcl_centering(&lights.state())`.
+
+### Changed
+
+- **No example sketch contains an `&` or a `*` any more.** The style guide is
+  explicit that *"beginning users of C find pointers the biggest roadblock, and
+  get very confused by `&` and `*`"*, and three sketches were handing them out:
+  `rcl_config_default(&cfg)` in `RcLightsSwitchModes`, `rcl_centering(&...)` in
+  `RcLightsCalibrate`, and a `const RcLightsPins &` in `RcLightsBasic`. The
+  first is now field assignment as `RcLightsCar` already used, the second is
+  `centering()`, and the third is a copy of a nine-field struct, which costs
+  nothing worth counting.
+
+- The examples and the README use the short constant spellings throughout.
+
+### Note on the style guide
+
+The guide's casing rule is about **function names** — *"camel case function
+names, not underscore ... `analogRead`, not `analog_read`"* — and every function
+in `RcLights` already satisfies it. The settings are data members inherited from
+`rcl_config_t`, where snake_case is correct C, and they stay as they are: making
+them camelCase would mean either camelCase fields in a C header whose functions
+are `rcl_snake_case()`, or a second copy of all 34 settings in the wrapper,
+costing 116 bytes of RAM and reintroducing exactly the drift the inheritance was
+added to remove.
 
 ## [0.1.0]
 

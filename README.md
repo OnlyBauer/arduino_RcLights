@@ -79,9 +79,9 @@ and it asks you for three things:
 ```cpp
 void setup()
 {
-    lights.esc_mode = RCL_ESC_BRAKE_THEN_REVERSE;   // or RCL_ESC_DIRECT_REVERSE
-    lights.aux_mode = RCL_AUX_MODE_3POS;            // or 2POS, or OFF
-    lights.outputs  = RCLIGHTS_OUTPUTS_ACTIVE_HIGH; // LEDs switched to ground
+    lights.esc_mode = ESC_BRAKE_THEN_REVERSE;  // or ESC_DIRECT_REVERSE
+    lights.aux_mode = SWITCH_3POS;             // or SWITCH_2POS, or SWITCH_NONE
+    lights.outputs  = LEDS_ACTIVE_HIGH;        // LEDs switched to ground
 
     lights.begin();
 }
@@ -151,7 +151,7 @@ straight off a pin through a resistor; a light bar, a string, or anything above
 positive rail instead of to ground, say so rather than rewiring:
 
 ```cpp
-lights.outputs = RCLIGHTS_OUTPUTS_ACTIVE_LOW;   // before begin()
+lights.outputs = LEDS_ACTIVE_LOW;   // before begin()
 ```
 
 `begin()` applies that before it first drives the pins, so an active-low string
@@ -190,8 +190,8 @@ cfg.cal[RCL_CH_STEER].max_us = 1996;
 guessed:
 
 ```cpp
-lights.esc_mode = RCL_ESC_BRAKE_THEN_REVERSE;  // back stick brakes; reverse needs neutral
-lights.esc_mode = RCL_ESC_DIRECT_REVERSE;      // back stick reverses out of the brake
+lights.esc_mode = ESC_BRAKE_THEN_REVERSE;  // back stick brakes; reverse needs neutral
+lights.esc_mode = ESC_DIRECT_REVERSE;      // back stick reverses out of the brake
 ```
 
 There is no speed sensor, so "is the car still moving?" is inferred from the

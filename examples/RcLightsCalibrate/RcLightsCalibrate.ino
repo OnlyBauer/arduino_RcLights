@@ -82,7 +82,7 @@ void report()
         Serial.println(lights.channel(ch));
     }
 
-    if (rcl_centering(&lights.state()))
+    if (lights.centering())
         Serial.println(F("measuring the stick centres; leave them alone"));
 
     Serial.print(F("drive="));

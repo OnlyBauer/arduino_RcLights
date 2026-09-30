@@ -41,7 +41,7 @@ void setup()
         }
     }
 
-    const RcLightsPins &p = lights.pins();
+    RcLightsPins p = lights.pins();
     Serial.print(F("RcLights on "));
     Serial.println(F(RCLIGHTS_BOARD_NAME));
     Serial.print(F("  inputs  ch1="));

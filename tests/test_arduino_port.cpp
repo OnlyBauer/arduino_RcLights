@@ -308,6 +308,62 @@ static void test_output_polarity(void)
     CHECK_EQ_INT(mock_analog(PIN_FRONT), 255, "and end() leaves it dark, not lit");
 }
 
+/**
+ * @brief The short constant spellings name the same values as the long ones.
+ *
+ * They exist because the Arduino style guide asks for shorter constants, and
+ * they are what the examples type. An alias pointing at the wrong value would
+ * be a bug a reader could not see -- both spellings compile, and both look
+ * plausible -- so each one is checked here against what it aliases.
+ */
+static void test_short_constants(void)
+{
+    CHECK_EQ_INT(LEDS_ACTIVE_HIGH, RCLIGHTS_OUTPUTS_ACTIVE_HIGH, "LEDS_ACTIVE_HIGH");
+    CHECK_EQ_INT(LEDS_ACTIVE_LOW, RCLIGHTS_OUTPUTS_ACTIVE_LOW, "LEDS_ACTIVE_LOW");
+
+    CHECK_EQ_INT(ESC_BRAKE_THEN_REVERSE, RCL_ESC_BRAKE_THEN_REVERSE,
+                 "ESC_BRAKE_THEN_REVERSE");
+    CHECK_EQ_INT(ESC_DIRECT_REVERSE, RCL_ESC_DIRECT_REVERSE, "ESC_DIRECT_REVERSE");
+
+    CHECK_EQ_INT(SWITCH_NONE, RCL_AUX_MODE_OFF, "SWITCH_NONE");
+    CHECK_EQ_INT(SWITCH_2POS, RCL_AUX_MODE_2POS, "SWITCH_2POS");
+    CHECK_EQ_INT(SWITCH_3POS, RCL_AUX_MODE_3POS, "SWITCH_3POS");
+
+    CHECK_EQ_INT(ACTION_NOTHING, RCL_AUX_ACTION_NONE, "ACTION_NOTHING");
+    CHECK_EQ_INT(ACTION_HAZARDS, RCL_AUX_ACTION_HAZARD, "ACTION_HAZARDS");
+    CHECK_EQ_INT(ACTION_AUX, RCL_AUX_ACTION_AUX, "ACTION_AUX");
+    CHECK_EQ_INT(ACTION_LIGHTS_OFF, RCL_AUX_ACTION_LIGHTS_OFF, "ACTION_LIGHTS_OFF");
+
+    /* And they are usable where the long ones are, which is the whole point. */
+    mock_reset();
+    RcLights lights;
+    lights.esc_mode = ESC_DIRECT_REVERSE;
+    lights.aux_mode = SWITCH_2POS;
+    lights.aux_action[2] = ACTION_HAZARDS;
+    lights.outputs = LEDS_ACTIVE_HIGH;
+    CHECK(lights.begin(kPins), "a sketch can use the short spellings throughout");
+    CHECK_EQ_INT(lights.config().esc_mode, RCL_ESC_DIRECT_REVERSE, "and they apply");
+    lights.end();
+}
+
+/** @brief centering() reports the automatic centring without a pointer. */
+static void test_centering_accessor(void)
+{
+    mock_reset();
+    RcLights lights;
+    CHECK(lights.begin(kPins), "begin");
+
+    /* It exists so that a sketch never has to write rcl_centering(&state). */
+    CHECK(lights.centering(), "centring is pending before any pulse arrives");
+
+    feed(lights, 1500, 1500, 1000, 400);
+    CHECK(!lights.centering(), "and done once the window has passed");
+    CHECK_EQ_INT(lights.centering(), rcl_centering(&lights.state()),
+                 "it agrees with the core it forwards to");
+
+    lights.end();
+}
+
 /** @brief Only one instance may own the interrupts. */
 static void test_single_instance(void)
 {
@@ -469,6 +525,8 @@ int main(void)
     test_settings_are_fields();
     test_apply_while_running();
     test_output_polarity();
+    test_short_constants();
+    test_centering_accessor();
     test_single_instance();
     test_aux_without_pin();
     test_partial_wiring();

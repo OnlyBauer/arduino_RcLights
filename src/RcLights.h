@@ -57,6 +57,50 @@ enum RcLightsOutputs {
     RCLIGHTS_OUTPUTS_ACTIVE_LOW
 };
 
+/*
+ * Short spellings of the values a sketch actually types.
+ *
+ * The Arduino style guide asks for this: "LONG_CONSTANT_NAMES_FULL_OF_CAPS are
+ * hard to read. Try to simplify when possible, without being terse."
+ * RCL_AUX_ACTION_LIGHTS_OFF is twenty-five characters of which the first
+ * fifteen say nothing to the person typing it.
+ *
+ * The long names are not deprecated and never will be: they are the C core's,
+ * where a prefix is the only namespace there is, and any sketch or port using
+ * them keeps working. These are the Arduino-facing spellings, and they are what
+ * the examples and the documentation use.
+ *
+ * `const` at namespace scope has internal linkage in C++, so these cost no
+ * storage and cannot collide at link time. tests/test_arduino_port.cpp checks
+ * each one against the value it aliases, so a typo here cannot go unnoticed.
+ */
+
+/** @brief LEDs switched to ground. @see RCLIGHTS_OUTPUTS_ACTIVE_HIGH */
+const RcLightsOutputs LEDS_ACTIVE_HIGH = RCLIGHTS_OUTPUTS_ACTIVE_HIGH;
+/** @brief LEDs wired to the supply rail. @see RCLIGHTS_OUTPUTS_ACTIVE_LOW */
+const RcLightsOutputs LEDS_ACTIVE_LOW = RCLIGHTS_OUTPUTS_ACTIVE_LOW;
+
+/** @brief Back stick brakes; reverse needs neutral. @see RCL_ESC_BRAKE_THEN_REVERSE */
+const rcl_esc_mode_t ESC_BRAKE_THEN_REVERSE = RCL_ESC_BRAKE_THEN_REVERSE;
+/** @brief Back stick reverses out of the brake. @see RCL_ESC_DIRECT_REVERSE */
+const rcl_esc_mode_t ESC_DIRECT_REVERSE = RCL_ESC_DIRECT_REVERSE;
+
+/** @brief No third channel. @see RCL_AUX_MODE_OFF */
+const rcl_aux_mode_t SWITCH_NONE = RCL_AUX_MODE_OFF;
+/** @brief A two-position switch. @see RCL_AUX_MODE_2POS */
+const rcl_aux_mode_t SWITCH_2POS = RCL_AUX_MODE_2POS;
+/** @brief A three-position switch. @see RCL_AUX_MODE_3POS */
+const rcl_aux_mode_t SWITCH_3POS = RCL_AUX_MODE_3POS;
+
+/** @brief Switch position does nothing. @see RCL_AUX_ACTION_NONE */
+const rcl_aux_action_t ACTION_NOTHING = RCL_AUX_ACTION_NONE;
+/** @brief Switch position raises the hazards. @see RCL_AUX_ACTION_HAZARD */
+const rcl_aux_action_t ACTION_HAZARDS = RCL_AUX_ACTION_HAZARD;
+/** @brief Switch position drives the auxiliary output. @see RCL_AUX_ACTION_AUX */
+const rcl_aux_action_t ACTION_AUX = RCL_AUX_ACTION_AUX;
+/** @brief Switch position kills the park lights. @see RCL_AUX_ACTION_LIGHTS_OFF */
+const rcl_aux_action_t ACTION_LIGHTS_OFF = RCL_AUX_ACTION_LIGHTS_OFF;
+
 /**
  * @brief Three RC channels in, six light outputs out.
  *
@@ -236,6 +280,18 @@ public:
      * @return true while a required channel has gone quiet.
      */
     bool failsafe() const;
+
+    /**
+     * @brief Whether the stick centres are still being measured.
+     *
+     * True for the first rcl_config_t::auto_center_ms of signal after the
+     * receiver comes up, during which both sticks read as centred. A sketch
+     * that tells the user what is happening can say so; nothing needs to wait
+     * for it.
+     *
+     * @return true while either stick is still being measured.
+     */
+    bool centering() const;
 
     /**
      * @brief The controller state, for anything the accessors do not cover.

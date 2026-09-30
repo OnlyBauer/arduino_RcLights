@@ -234,6 +234,11 @@ bool RcLights::failsafe() const
     return m_state.failsafe;
 }
 
+bool RcLights::centering() const
+{
+    return rcl_centering(&m_state);
+}
+
 const rcl_state_t &RcLights::state() const
 {
     return m_state;

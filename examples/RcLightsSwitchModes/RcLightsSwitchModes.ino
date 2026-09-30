@@ -36,56 +36,53 @@ void setup()
 {
     Serial.begin(115200);
 
-    rcl_config_t cfg;
-    rcl_config_default(&cfg);
-
 #if SETUP == 1
     /* A three-position switch, which is what the defaults assume:
      * down — nothing, middle — light bar, up — hazards. */
-    cfg.aux_mode = RCL_AUX_MODE_3POS;
-    cfg.aux_action[0] = RCL_AUX_ACTION_NONE;
-    cfg.aux_action[1] = RCL_AUX_ACTION_AUX;
-    cfg.aux_action[2] = RCL_AUX_ACTION_HAZARD;
+    lights.aux_mode = SWITCH_3POS;
+    lights.aux_action[0] = ACTION_NOTHING;
+    lights.aux_action[1] = ACTION_AUX;
+    lights.aux_action[2] = ACTION_HAZARDS;
 
 #elif SETUP == 2
     /* A plain on/off toggle for the hazards. The middle entry is ignored in
      * two-position mode; the gap between aux_low and aux_high becomes
      * hysteresis, so a switch that reads slightly differently each time does
      * not chatter. */
-    cfg.aux_mode = RCL_AUX_MODE_2POS;
-    cfg.aux_action[0] = RCL_AUX_ACTION_NONE;
-    cfg.aux_action[2] = RCL_AUX_ACTION_HAZARD;
+    lights.aux_mode = SWITCH_2POS;
+    lights.aux_action[0] = ACTION_NOTHING;
+    lights.aux_action[2] = ACTION_HAZARDS;
 
 #elif SETUP == 3
     /* A light switch, as on a real car: off, park and driving lights, plus a
      * light bar at the top. Note that the brake light, the reversing light and
      * the indicators keep working in the "off" position — they do on a real car
      * too, and for the same reason. */
-    cfg.aux_mode = RCL_AUX_MODE_3POS;
-    cfg.aux_action[0] = RCL_AUX_ACTION_LIGHTS_OFF;
-    cfg.aux_action[1] = RCL_AUX_ACTION_NONE;
-    cfg.aux_action[2] = RCL_AUX_ACTION_AUX;
+    lights.aux_mode = SWITCH_3POS;
+    lights.aux_action[0] = ACTION_LIGHTS_OFF;
+    lights.aux_action[1] = ACTION_NOTHING;
+    lights.aux_action[2] = ACTION_AUX;
 
 #else
     /* A two-channel receiver, or a channel 3 you would rather use for
      * something else. Nothing is wired to the third input and nothing waits
      * for it. */
-    cfg.aux_mode = RCL_AUX_MODE_OFF;
+    lights.aux_mode = SWITCH_NONE;
 #endif
 
     /* Where the positions sit. A three-position switch usually gives about
      * 1000, 1500 and 2000 µs; these thresholds land either side of the middle
      * one with room to spare. */
-    cfg.aux_low = -300;
-    cfg.aux_high = 300;
+    lights.aux_low = -300;
+    lights.aux_high = 300;
 
     RcLightsPins pins = RCLIGHTS_PINS_DEFAULT;
 #if SETUP == 4
     pins.ch3 = RCLIGHTS_PIN_NONE;
 #endif
 
-    if (!lights.begin(pins, cfg)) {
-        Serial.println(F("RcLights: begin() refused the configuration"));
+    if (!lights.begin(pins)) {
+        Serial.println(F("RcLights: begin() refused the settings"));
         while (true) {
         }
     }
