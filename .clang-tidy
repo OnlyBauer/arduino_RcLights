@@ -1,0 +1,101 @@
+# Statische Analyse für RcLights, geprüft von tools/ci.sh lint und der Stufe
+# lint in .gitlab-ci.yml.
+#
+# Die Prüfliste ist aus arduino_crsf übernommen; die Abschaltungen sind es
+# ausdrücklich nicht. Dieses Repository hat keinen eingebetteten Fremdkern und
+# kein Wire-Protokoll, also fallen die meisten Gründe weg, aus denen dort etwas
+# abgeschaltet werden musste. Was hier steht, ist begründet, was dort stand und
+# hier fehlt, war für dieses Repository nie zutreffend.
+#
+# Der Zweck ist Regressionsschutz, nicht Fundsuche: auf dem Stand, an dem die
+# Prüfung eingeführt wurde, meldet sie über rclights_core.c und RcLights.cpp
+# nichts. Der Job ist deshalb von Anfang an blockierend und nicht
+# allow_failure -- er soll rot werden, sobald der nächste Patch etwas einträgt.
+#
+# WarningsAsErrors steht auf allem, was Checks überhaupt aktiviert. Ein
+# clang-tidy-Lauf ohne das gibt Exit-Code 0 auch bei Warnungen und wäre in CI
+# stillschweigend nutzlos.
+
+Checks: >
+  -*,
+  bugprone-*,
+  cert-*,
+  clang-analyzer-*,
+  misc-*,
+  performance-*,
+  portability-*,
+  readability-inconsistent-declaration-parameter-name,
+  readability-non-const-parameter,
+  readability-misleading-indentation,
+  readability-misplaced-array-index,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-narrowing-conversions,
+  -cert-dcl37-c,
+  -cert-dcl51-cpp,
+  -cert-err33-c,
+  -cert-err58-cpp,
+  -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,
+  -misc-include-cleaner,
+  -misc-const-correctness,
+  -misc-use-anonymous-namespace
+
+WarningsAsErrors: '*'
+
+HeaderFilterRegex: 'rclights_(core|config|board)\.h$|RcLights\.h$'
+
+# Begründung für jede einzelne Abschaltung oben -- ohne diese Liste wüsste beim
+# nächsten Mal niemand mehr, ob eine Prüfung aus gutem Grund oder aus Bequem-
+# lichkeit fehlt:
+#
+# bugprone-easily-swappable-parameters
+#   Meldet jede Funktion mit zwei benachbarten Parametern gleichen Typs. Die
+#   Kalibrierung besteht aus drei Mikrosekundenwerten hintereinander
+#   (min, center, max) und die Helligkeiten aus mehreren uint8_t; beides ist in
+#   dieser Reihenfolge das, was der Benutzer im Datenblatt und am Sender sieht,
+#   und eine Struktur pro Argumentpaar würde die API verschlechtern statt sie
+#   sicherer zu machen. Die Kalibrierwerte werden stattdessen von
+#   rcl_config_validate() geprüft, was ein vertauschtes Paar tatsächlich fängt,
+#   statt es nur zu erschweren.
+#
+# bugprone-narrowing-conversions
+#   Die Kernlogik rechnet in int32_t und gibt Helligkeiten als uint8_t aus. Jede
+#   dieser Wandlungen steht hinter einer Klemmung auf 0..255, die diese Prüfung
+#   nicht sehen kann.
+#
+# cert-dcl37-c / cert-dcl51-cpp
+#   Reservierte Bezeichner. Schlägt auf die Include-Wächter (RCLIGHTS_..._H) an,
+#   die keine sind.
+#
+# cert-err33-c
+#   Verlangt, den Rückgabewert von printf & Co. zu prüfen. In den Testsuiten ist
+#   das sinnlos.
+#
+# cert-err58-cpp
+#   Verlangt, dass der Konstruktor eines Objekts mit statischer Speicherdauer
+#   nicht werfen kann. Betrifft hier die eine statische RcLights-Instanz, die
+#   jeder Sketch anlegt, und die Attrappen in tests/. Kein Repository dieses
+#   Projekts verwendet Ausnahmebehandlung; es ist ein Ziel für Mikrocontroller.
+#
+# clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling
+#   Verlangt memset_s aus C11 Annex K für die beiden memset-Aufrufe in
+#   rclights_core.c. Annex K ist optional, und keine der hier in Frage
+#   kommenden C-Bibliotheken -- avr-libc, newlib, glibc -- stellt sie bereit.
+#   Beide Aufrufe nullen eine Struktur bekannter Größe über sizeof(*ptr); es
+#   gibt keine Länge, die falsch sein könnte.
+#
+# misc-include-cleaner
+#   Verlangt, jeden benutzten Namen direkt zu inkludieren. Auf Arduino.h, das
+#   selbst ein Sammel-Header über ein halbes Dutzend Core-Header ist, führt das
+#   zu Vorschlägen, die auf einem anderen Core nicht übersetzen.
+#
+# misc-const-correctness
+#   Meldet in den CHECK_EQ_*-Makros aus test_util.h angelegte Skalarvariablen.
+#   test_util.h ist unverändert aus c_crsf übernommen und wird nicht wegen einer
+#   C++-Eigenheit angepasst, die in keinem anderen Repository dieses Projekts
+#   existiert.
+#
+# misc-use-anonymous-namespace
+#   Verlangt anonyme Namensräume statt interner Verknüpfung über `static`.
+#   `static` für Datei-lokale Funktionen ist das Idiom in allen vier
+#   Repositories, von denen drei reines C sind, wo es anonyme Namensräume nicht
+#   gibt.

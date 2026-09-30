@@ -1,0 +1,21 @@
+{
+  "name": "RcLights",
+  "version": "0.1.0",
+  "description": "Scale light controller for an RC car: three receiver channels in, six PWM light outputs out. Park and driving light, tail and brake light, reversing light, turn signals that trigger on a deliberate steering input, and a channel 3 switch you assign to hazards, an auxiliary output or a light switch. The decision logic is portable C with host tests; the Arduino layer only captures pulses and writes PWM.",
+  "keywords": "rc, car, lights, pwm, servo, brake, indicator, hazard, esc",
+  "authors": [
+    {
+      "name": "Maximilian Bauer",
+      "email": "maximilian@bauer.pub",
+      "maintainer": true
+    }
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://git.bauer.pub/Bauer/arduino_rclights.git"
+  },
+  "license": "Apache-2.0",
+  "frameworks": "arduino",
+  "platforms": ["atmelavr", "espressif32", "ststm32"],
+  "headers": "RcLights.h"
+}

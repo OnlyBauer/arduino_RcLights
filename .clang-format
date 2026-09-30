@@ -1,0 +1,95 @@
+# Formatvorgabe für arduino_rclights, geprüft von tools/ci.sh lint und der
+# Stufe lint in .gitlab-ci.yml.
+#
+# Wortgleich übernommen aus arduino_crsf, absichtlich und ohne Anpassung: die
+# vier Repositories dieses Projekts werden von derselben Person gepflegt und oft
+# am selben Tag angefasst. Ein Stil, der sich zwischen ihnen unterscheidet,
+# erzeugt bei jedem Wechsel Diff-Rauschen, das nichts bedeutet. Die Begründungen
+# unten stammen aus der Messung dort und gelten hier unverändert.
+#
+# Der Stil in einem Satz: Linux-Klammern, vier Leerzeichen, Stern am Namen,
+# kein automatischer Umbruch.
+
+BasedOnStyle: LLVM
+
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+
+# Kein Zeilenlimit, also bricht clang-format nichts um, was schon umgebrochen
+# ist. Das ist der wichtigste Schalter hier: mit einem Limit formatiert das
+# Werkzeug jeden Ausdruck neu nach eigenem Geschmack und der Umbau wird groß,
+# ohne dass eine Zeile dadurch besser lesbar würde. Die Zeilenlänge bleibt
+# damit Sache des Autors — der Bestand liegt bis auf zwei Dateien unter 100
+# Spalten und soll das auch bleiben.
+ColumnLimit: 0
+
+# Funktionsrumpf-Klammer auf eigener Zeile, Kontrollfluss-Klammer dahinter.
+BreakBeforeBraces: Linux
+
+# uint8_t *out, nicht uint8_t* out.
+PointerAlignment: Right
+ReferenceAlignment: Right
+
+# Die Include-Reihenfolge ist gewollt (eigener Header zuerst, dann System),
+# clang-format soll sie nicht alphabetisch umsortieren.
+SortIncludes: Never
+
+# Auch ein einzeiliger Rumpf gehört bei einer Funktion auf eigene Zeilen; die
+# kurze Form `if (!r) { return false; }` bei Wächtern bleibt dagegen erlaubt.
+# Abweichung von den drei Schwesterprojekten, und die einzige.
+#
+# clang-format kennt kein eigenes "C": .c und .cpp werden beide als Cpp
+# formatiert, eine sprachabhaengige Sektion gibt es also nicht. Der eigene
+# Code dieses Repositories ist vollstaendig C++ -- der eingebettete Kern wird
+# ohnehin nicht geprueft -- weshalb die Einstellung hier ohne Nebenwirkung
+# umgestellt werden kann.
+#
+# Mit None wird aus jedem der rund fuenfzehn trivialen Accessoren in
+# CRSFv3.h ein Vierzeiler. Das ist fuer C richtig, wo es keine gibt, und
+# macht ausgerechnet die Datei unleserlich, die das Aushaengeschild der
+# Bibliothek ist. Inline laesst nur *in* einer Klasse definierte Kurzmethoden
+# auf einer Zeile; freistehende Funktionen bleiben aufgeklappt wie ueberall.
+AllowShortFunctionsOnASingleLine: Inline
+
+# public:/private: auf der Ebene der Klasse statt zwei Spalten eingerueckt.
+AccessModifierOffset: -4
+AllowShortBlocksOnASingleLine: Always
+AllowShortIfStatementsOnASingleLine: WithoutElse
+AllowShortLoopsOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: false
+
+# (uint8_t)x, nicht (uint8_t) x.
+SpaceAfterCStyleCast: false
+
+# case auf der Höhe des switch, wie im Bestand.
+IndentCaseLabels: false
+IndentGotoLabels: false
+IndentPPDirectives: None
+
+# Ausrichtung nicht erzwingen: der Bestand richtet `=` in manchen Blöcken
+# bewusst aus und in anderen bewusst nicht. Ein globales Consecutive hat den
+# Umbau messbar vergrößert (15 % -> 17 %), weil es die nicht ausgerichteten
+# Stellen umschreibt. Wo Ausrichtung Absicht ist, steht sie unter
+# `clang-format off`.
+AlignConsecutiveAssignments: None
+AlignConsecutiveDeclarations: None
+AlignConsecutiveMacros: None
+AlignTrailingComments: true
+AlignEscapedNewlines: Left
+AlignAfterOpenBracket: Align
+AlignOperands: Align
+
+# Kommentare nicht neu umbrechen. Die Dateien sind stark kommentiert, oft mit
+# Absätzen, Aufzählungen und Spaltentabellen darin; ein Reflow zerlegt die.
+ReflowComments: false
+
+# Argumente und Parameter dicht packen statt einen pro Zeile.
+BinPackArguments: true
+BinPackParameters: true
+
+# Leerzeile am Blockanfang entfernen, mehrfache Leerzeilen auf eine begrenzen.
+KeepEmptyLinesAtTheStartOfBlocks: false
+MaxEmptyLinesToKeep: 1
+
+InsertNewlineAtEOF: true

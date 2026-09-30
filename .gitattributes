@@ -1,0 +1,35 @@
+# Zeilenenden festnageln. Die Bibliothek wird auf Windows entwickelt und in
+# Linux-Containern gebaut; ohne diese Datei hängt es an der lokalen
+# core.autocrlf-Einstellung, ob ein Commit CRLF in das Repository trägt.
+#
+# `* text=auto` normalisiert alles, was Git für Text hält, im Repository auf LF.
+# Die Auszeichnungen darunter nehmen die Heuristik aus dem Spiel.
+
+* text=auto
+
+*.c    text eol=lf
+*.h    text eol=lf
+*.cpp  text eol=lf
+*.ino  text eol=lf
+*.md   text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+*.py   text eol=lf
+*.sh   text eol=lf
+*.json text eol=lf
+Makefile text eol=lf
+Doxyfile text eol=lf
+library.properties text eol=lf
+.clang-format text eol=lf
+.clang-tidy   text eol=lf
+.editorconfig text eol=lf
+.gitattributes text eol=lf
+
+# keywords.txt braucht echte Tabulatoren; die IDE trennt daran und ignoriert
+# eine Zeile mit Leerzeichen stillschweigend. Die Zeile steht hier trotzdem nur
+# wegen der Zeilenenden -- Tabulatoren kann .gitattributes nicht schützen, das
+# tut tools/ci.sh lint.
+*.txt  text eol=lf
+
+# PowerShell erwartet CRLF.
+*.ps1  text eol=crlf

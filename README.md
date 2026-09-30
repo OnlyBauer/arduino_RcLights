@@ -1,93 +1,268 @@
-# arduino_rcLights
+# RcLights
 
+A scale light controller for an RC car. Three receiver channels in, six PWM
+light outputs out.
 
+```text
+        ch1 steering  ──┐                    ┌──  front   park / driving light
+        ch2 throttle  ──┼──►  RcLights  ─────┼──  rear    tail / brake light
+        ch3 switch    ──┘                    ├──  reverse
+                                             ├──  turn left
+                                             ├──  turn right
+                                             └──  aux     light bar, beacon, ...
+```
+
+What it does, out of the box:
+
+- **Tail and brake light on one LED.** Dim while the car is standing or
+  driving, full brightness while braking, held for a moment after the brake is
+  released so a stab at the brakes is still visible.
+- **Park and driving light on one LED.** Dim at rest, brighter while moving.
+  Both LEDs fade between their two levels rather than stepping, which reads as
+  a lamp rather than as a delay.
+- **A reversing light** that is on while the car is actually reversing — and
+  not while it is braking, which is the part that takes some care.
+- **Turn signals that indicate rather than twitch.** They only start once the
+  steering has been centred for a moment, so taking a corner sets them flashing
+  and correcting the line mid-corner does not.
+- **Hazards, or an auxiliary output, or a light switch** on channel 3, as a
+  two- or three-position switch, with each position assigned to whatever you
+  want it to do.
+- **Hazards on signal loss**, recovering by itself when the transmitter comes
+  back.
+
+Runs on an Arduino Nano, an ST Nucleo and an ESP32 DevKit from the same source.
+
+> **Status: 0.1.0, not verified on a car.** It compiles for all three targets
+> and passes 193 host checks. Nobody has driven it yet. See
+> [CHANGELOG.md](CHANGELOG.md) for what that specifically means.
 
 ## Getting started
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+```cpp
+#include <RcLights.h>
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+RcLights lights;
 
-## Add your files
+void setup()
+{
+    lights.begin();     // this board's default pins
+}
 
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
-
+void loop()
+{
+    lights.loop();      // call as often as you like
+}
 ```
-cd existing_repo
-git remote add origin https://git.bauer.pub/Bauer/arduino_rclights.git
-git branch -M main
-git push -uf origin main
+
+That is the complete `RcLightsBasic` example. Upload it, open the serial
+monitor at 115200 baud, and it prints which pins it is using.
+
+For a real car, start from **`RcLightsCar`**. It is a complete implementation
+and it asks you for three things:
+
+```cpp
+void setup()
+{
+    lights.esc_mode = RCL_ESC_BRAKE_THEN_REVERSE;   // or RCL_ESC_DIRECT_REVERSE
+    lights.aux_mode = RCL_AUX_MODE_3POS;            // or 2POS, or OFF
+    lights.outputs  = RCLIGHTS_OUTPUTS_ACTIVE_HIGH; // LEDs switched to ground
+
+    lights.begin();
+}
 ```
 
-## Integrate with your tools
+Everything else has a working default, including the pins, which the library
+chooses from the board you are compiling for, and the stick centres, which it
+measures at startup. Below those three lines the sketch has an **optional**
+block listing every other setting there is, each one already set to the value
+it has — delete the block and nothing changes, keep a line and change it and
+only that changes. A test compiles that sketch and fails if a value in the
+block ever stops matching the library's own default.
 
-* [Set up project integrations](https://git.bauer.pub/Bauer/arduino_rclights/-/settings/integrations)
+The four examples:
 
-## Collaborate with your team
+| Example | What it shows |
+| --- | --- |
+| `RcLightsCar` | **a complete car: set the pins, upload, drive** |
+| `RcLightsBasic` | the whole library in fifteen lines |
+| `RcLightsCalibrate` | measure your receiver, and watch what the controller makes of it |
+| `RcLightsSwitchModes` | the four things channel 3 can be |
 
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+## Wiring
 
-## Test and Deploy
+The library picks the pins from the board you compile for. You do not have to
+set any of them.
 
-Use the built-in continuous integration in GitLab.
+| | Nano / Uno | Nucleo-64 | ESP32 DevKit |
+| --- | --- | --- | --- |
+| ch1 steering | D4 | D2 | GPIO 34 |
+| ch2 throttle | D7 | D4 | GPIO 35 |
+| ch3 switch | D8 | D7 | GPIO 32 |
+| front | D3 | D3 | GPIO 13 |
+| rear | D5 | D5 | GPIO 14 |
+| reverse | D6 | D6 | GPIO 27 |
+| turn left | D9 | D9 | GPIO 26 |
+| turn right | D10 | D10 | GPIO 25 |
+| aux | D11 | D11 | GPIO 33 |
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
+Two rules picked every one of those: an input has to be able to raise an
+interrupt, and an output has to have a timer channel behind it. On the Nano the
+six hardware PWM pins are exactly the six outputs, which is why the inputs are
+on pins that have none.
 
-***
+To move one, set its macro from the build — every pin is guarded, so whatever
+you define wins:
 
-# Editing this README
+```ini
+; platformio.ini
+build_flags = -DRCLIGHTS_PIN_FRONT=6 -DRCLIGHTS_PIN_AUX=RCLIGHTS_PIN_NONE
+```
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+```sh
+arduino-cli compile --build-property "compiler.cpp.extra_flags=-DRCLIGHTS_PIN_FRONT=6" ...
+```
 
-## Suggestions for a good README
+The Arduino IDE has no field for build flags; there, define the macro in the
+sketch above `#include <RcLights.h>`. The names are `RCLIGHTS_PIN_STEERING`,
+`_THROTTLE`, `_CH3`, `_FRONT`, `_REAR`, `_REVERSE`, `_SIGNAL_LEFT`,
+`_SIGNAL_RIGHT` and `_AUX`. Anything you have not wired gets
+`RCLIGHTS_PIN_NONE` and is never driven, so a car with no reversing light needs
+no other change.
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+The outputs are logic-level PWM, not LED drivers. A single indicator LED runs
+straight off a pin through a resistor; a light bar, a string, or anything above
+20 mA wants a transistor or a small MOSFET. If your LEDs are wired to the
+positive rail instead of to ground, say so rather than rewiring:
 
-## Name
-Choose a self-explaining name for your project.
+```cpp
+lights.outputs = RCLIGHTS_OUTPUTS_ACTIVE_LOW;   // before begin()
+```
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+`begin()` applies that before it first drives the pins, so an active-low string
+does not flash at full brightness on the way up. For a car wired both ways
+round, leave `outputs` alone and call `setInvertedOutputs(mask)` after `begin()`
+with one bit per output.
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+### Receiver
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+The three channels are ordinary servo outputs; nothing about the library is
+specific to a protocol. Steering on channel 1, throttle on channel 2, a switch
+on channel 3 — or in whatever order your receiver labels them, since the pin map
+is yours to write. Receiver ground and the board's ground have to be connected.
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+## Setting it up for your car
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+**The stick centres look after themselves.** For the first 200 ms after the
+receiver comes up, the library averages what the steering and throttle are
+sending and takes that as their rest position, so transmitter trim needs no
+setting anywhere. Leave the sticks alone when you switch on. If they move while
+it is measuring, or if what it measures is more than 200 µs from nominal — a
+stick being held rather than a trim offset — it keeps the configured centre
+instead, so holding full throttle at power-up cannot calibrate full throttle as
+neutral.
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+The endpoints are still nominal 1000/2000 µs. If the indicators trigger at the
+wrong point, run `RcLightsCalibrate`, move every stick to both stops, and set
+what it prints:
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+```cpp
+cfg.cal[RCL_CH_STEER].min_us = 1004;
+cfg.cal[RCL_CH_STEER].max_us = 1996;
+```
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+**Your ESC** is the one thing that has to be told, and the one that cannot be
+guessed:
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+```cpp
+lights.esc_mode = RCL_ESC_BRAKE_THEN_REVERSE;  // back stick brakes; reverse needs neutral
+lights.esc_mode = RCL_ESC_DIRECT_REVERSE;      // back stick reverses out of the brake
+```
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+There is no speed sensor, so "is the car still moving?" is inferred from the
+throttle history over `coast_ms`. Set it to roughly how long your car takes to
+coast to a stop from half throttle. Too long and the reversing light is slow to
+appear; too short and braking from speed turns into reverse.
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+Everything else has a default that works, and every setting is a field of the
+object — `RcLights` derives from
+[`rcl_config_t`](src/rclights_core.h), so there is no second list to fall out of
+step with the first:
 
-## License
-For open source projects, say how it is licensed.
+```cpp
+lights.level_front_park = 20;           // dimmer park light
+lights.brake_extend_ms = 600;           // hold the brake light a little longer
+lights.cal[RCL_CH_STEER].invert = true; // indicators on the wrong side
+lights.begin();
+```
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+Write the fields, call `begin()`. To change one while running, write it and
+call `apply()`. A sketch that keeps its settings elsewhere — read back from
+EEPROM, say — passes them as an `rcl_config_t` to `begin(pins, cfg)` or
+`applyConfig(cfg)` instead, and the object's fields are then updated to match
+what was applied. Every route validates first, and settings that cannot be
+acted on are refused rather than acted on badly.
+
+## How it is put together
+
+```text
+src/rclights_core.h/.c     the controller: plain C11, no Arduino, no I/O
+src/RcLights.h/.cpp        Arduino: capture pulses, write PWM, nothing else
+src/rclights_board.h       pin maps and the three facts that differ per board
+```
+
+The split is not decoration. Everything the lights do — the brake and reverse
+state machine, the turn signal arming rule, the blink phase, the failsafe — is
+in the core, and the core has no dependency beyond `<stdint.h>`. That is what
+lets `tests/test_core.c` fly the whole thing through stick sequences on a host,
+in a second, with no board involved, and it is why the same logic would drop
+into an ESP-IDF or STM32 HAL project unchanged.
+
+The Arduino layer is deliberately dull: it timestamps edges in an interrupt,
+hands the widths to the core, and writes what comes back.
+
+### The AVR problem, and what is done about it
+
+Three receiver channels need three edge-triggered inputs. An ATmega328P has two
+external interrupt pins. RcLights therefore installs its own pin-change
+interrupt handlers on AVR and **defines `PCINT0_vect`, `PCINT1_vect` and
+`PCINT2_vect`** — so it will not link alongside another library that does the
+same, which several softserial and RC receiver libraries do. If you hit that:
+
+```cpp
+#define RCLIGHTS_NO_AVR_PCINT   // before #include <RcLights.h>
+```
+
+and wire the channels you care about to D2 and D3. Nothing else on any other
+board is affected; Nucleo and ESP32 can attach an interrupt to any pin.
+
+## Building and testing
+
+The library needs nothing but a board core. To work on it:
+
+```sh
+tools/ci.sh            # everything this machine can run
+tools/ci.sh lint       # formatting, clang-tidy, versions, example layout
+make -C tests          # the two host suites
+make -C tests sanitize # the same under ASan and UBSan
+doxygen Doxyfile       # API docs into docs/html; warnings are errors
+```
+
+`tools/ci.sh` is what `.gitlab-ci.yml` calls, so a green run here is a green
+pipeline — with the exception of the `build-examples` job, which compiles the
+examples for Nano, ESP32 DevKit and Nucleo-64 and needs the toolchains.
+
+Three suites, and the split between the first two mirrors the source:
+
+| Suite | What it tests |
+| --- | --- |
+| `test_core` | the controller, through stick sequences, with no board |
+| `test_arduino_port` | the real wrapper against a mock Arduino runtime that delivers pulses as edges on pins |
+| `test_example_defaults` | the shipping `RcLightsCar.ino`, compiled as it ships, checking its optional block still lists the library's defaults |
+
+The AVR pin-change capture is not covered by any of them — it is compiled out
+on a host, and only a Nano can show whether it works.
+
+## Licence
+
+Apache-2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).

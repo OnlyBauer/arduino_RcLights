@@ -1,0 +1,79 @@
+#######################################
+# Syntax colouring for RcLights
+#
+# Fields are separated by a literal TAB, not spaces. The IDE's parser splits on
+# tab and silently ignores any line that uses spaces, so a tidied version of
+# this file looks perfectly fine and highlights nothing.
+#######################################
+
+RcLights	KEYWORD1
+RcLightsPins	KEYWORD1
+RcLightsOutputs	KEYWORD1
+rcl_config_t	KEYWORD1
+rcl_state_t	KEYWORD1
+rcl_cal_t	KEYWORD1
+rcl_input_t	KEYWORD1
+rcl_channel_t	KEYWORD1
+rcl_output_t	KEYWORD1
+rcl_drive_t	KEYWORD1
+rcl_aux_mode_t	KEYWORD1
+rcl_aux_action_t	KEYWORD1
+rcl_esc_mode_t	KEYWORD1
+
+esc_mode	KEYWORD2
+aux_mode	KEYWORD2
+outputs	KEYWORD2
+
+begin	KEYWORD2
+loop	KEYWORD2
+end	KEYWORD2
+applyConfig	KEYWORD2
+apply	KEYWORD2
+config	KEYWORD2
+pins	KEYWORD2
+pulseUs	KEYWORD2
+channelValid	KEYWORD2
+channel	KEYWORD2
+output	KEYWORD2
+drive	KEYWORD2
+failsafe	KEYWORD2
+state	KEYWORD2
+setInvertedOutputs	KEYWORD2
+setPwmFrequency	KEYWORD2
+captureCenter	KEYWORD2
+rcl_config_default	KEYWORD2
+rcl_config_validate	KEYWORD2
+rcl_normalize	KEYWORD2
+rcl_init	KEYWORD2
+rcl_update	KEYWORD2
+rcl_output	KEYWORD2
+rcl_channel	KEYWORD2
+rcl_drive_name	KEYWORD2
+rcl_centering	KEYWORD2
+
+RCL_CH_STEER	LITERAL1
+RCL_CH_THROTTLE	LITERAL1
+RCL_CH_AUX	LITERAL1
+RCL_OUT_FRONT	LITERAL1
+RCL_OUT_REAR	LITERAL1
+RCL_OUT_REVERSE	LITERAL1
+RCL_OUT_TURN_LEFT	LITERAL1
+RCL_OUT_TURN_RIGHT	LITERAL1
+RCL_OUT_AUX	LITERAL1
+RCL_DRIVE_IDLE	LITERAL1
+RCL_DRIVE_FORWARD	LITERAL1
+RCL_DRIVE_BRAKE	LITERAL1
+RCL_DRIVE_REVERSE	LITERAL1
+RCL_ESC_BRAKE_THEN_REVERSE	LITERAL1
+RCL_ESC_DIRECT_REVERSE	LITERAL1
+RCL_AUX_MODE_OFF	LITERAL1
+RCL_AUX_MODE_2POS	LITERAL1
+RCL_AUX_MODE_3POS	LITERAL1
+RCL_AUX_ACTION_NONE	LITERAL1
+RCL_AUX_ACTION_HAZARD	LITERAL1
+RCL_AUX_ACTION_AUX	LITERAL1
+RCL_AUX_ACTION_LIGHTS_OFF	LITERAL1
+RCLIGHTS_OUTPUTS_ACTIVE_HIGH	LITERAL1
+RCLIGHTS_OUTPUTS_ACTIVE_LOW	LITERAL1
+RCLIGHTS_PIN_NONE	LITERAL1
+RCLIGHTS_PINS_DEFAULT	LITERAL1

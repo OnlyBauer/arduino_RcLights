@@ -1,0 +1,97 @@
+# Doxygen configuration for the RcLights Arduino library.
+#
+#   doxygen            generate docs into docs/html
+#
+# The strict settings are deliberate. EXTRACT_ALL is off and
+# WARN_IF_UNDOCUMENTED is on, so anything without a comment is reported rather
+# than silently rendered as a bare signature; WARN_AS_ERROR then makes that fail
+# the run. WARN_IF_DOC_ERROR additionally catches an @param that names an
+# argument the function does not have, which is the failure mode that lets
+# documentation drift away from code unnoticed.
+
+PROJECT_NAME           = "RcLights"
+PROJECT_BRIEF          = "Scale light controller for an RC car"
+PROJECT_NUMBER         = 0.1.0
+OUTPUT_DIRECTORY       = docs
+
+# --- input ------------------------------------------------------------------
+
+INPUT                  = README.md \
+                         CHANGELOG.md \
+                         src \
+                         examples
+FILE_PATTERNS          = *.c *.h *.cpp *.ino *.md
+RECURSIVE              = YES
+# arduino_stubs/ is a mock Arduino runtime that exists so the tests can run.
+# It is not this project's interface, and holding it to WARN_IF_UNDOCUMENTED
+# would add noise rather than clarity.
+EXCLUDE_PATTERNS       = */build/* */build_tests/* */arduino_stubs/*
+USE_MDFILE_AS_MAINPAGE = README.md
+
+# --- language ---------------------------------------------------------------
+
+OPTIMIZE_OUTPUT_FOR_C  = NO
+TYPEDEF_HIDES_STRUCT   = YES
+
+# --- what to extract --------------------------------------------------------
+# EXTRACT_ALL stays NO on purpose: with it on, undocumented entities are
+# rendered without comment and never reported, which defeats the check below.
+
+EXTRACT_ALL            = NO
+EXTRACT_STATIC         = YES
+EXTRACT_PRIVATE        = NO
+HIDE_UNDOC_MEMBERS     = NO
+HIDE_UNDOC_CLASSES     = NO
+
+# --- strictness -------------------------------------------------------------
+
+QUIET                  = YES
+WARNINGS               = YES
+WARN_IF_UNDOCUMENTED   = YES
+WARN_IF_DOC_ERROR      = YES
+WARN_IF_INCOMPLETE_DOC = YES
+WARN_NO_PARAMDOC       = YES
+WARN_AS_ERROR          = FAIL_ON_WARNINGS
+
+# --- preprocessing ----------------------------------------------------------
+# The Arduino core headers are not on the include path here, and they are not
+# needed: only this library's own declarations are documented. Macro expansion
+# stays off so documented macros appear as written.
+#
+# The board detection in rclights_board.h is per-architecture, and Doxygen only
+# ever sees one branch of it. ARDUINO_ARCH_AVR is defined here so that the
+# branch which carries the pin-change capture -- the interesting one, and the
+# one whose documentation explains why the library is built this way -- is the
+# branch that ends up in the manual.
+
+ENABLE_PREPROCESSING   = YES
+MACRO_EXPANSION        = NO
+EXPAND_ONLY_PREDEF     = NO
+SEARCH_INCLUDES        = NO
+PREDEFINED             = __DOXYGEN__=1 \
+                         ARDUINO_ARCH_AVR=1
+
+# --- output -----------------------------------------------------------------
+
+GENERATE_HTML          = YES
+HTML_OUTPUT            = html
+GENERATE_LATEX         = NO
+GENERATE_TREEVIEW      = YES
+
+# The self-hosted GitLab instance's nginx caps requests at 1 MB, which is what
+# the `pages` job uploads the generated HTML as. VERBATIM_HEADERS's per-header
+# "browse the raw source" pages and SEARCHENGINE's client-side index are the
+# two biggest single contributors to that size, and neither is load-bearing:
+# the API docs (@brief/@param/etc.) are unaffected, the source is one click
+# away in the repository itself, and the sidebar tree plus the module/file
+# index pages still navigate the docs without a search box.
+SOURCE_BROWSER         = NO
+VERBATIM_HEADERS       = NO
+SEARCHENGINE           = NO
+SORT_MEMBER_DOCS       = NO
+SORT_BRIEF_DOCS        = NO
+JAVADOC_AUTOBRIEF      = NO
+ALWAYS_DETAILED_SEC    = NO
+REPEAT_BRIEF           = YES
+TAB_SIZE               = 4
+MARKDOWN_SUPPORT       = YES

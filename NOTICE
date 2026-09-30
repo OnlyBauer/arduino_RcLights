@@ -1,0 +1,13 @@
+arduino_rclights — RcLights, a scale light controller for RC cars
+Copyright 2026 Maximilian Bauer
+
+Licensed under the Apache License, Version 2.0. See the LICENSE file for the
+full terms, and NOTICE (this file) for the attribution that must travel with
+redistributions.
+
+--------------------------------------------------------------------------------
+
+This library contains no third-party code.
+
+tests/test_util.h is carried over unchanged from the c_crsf project by the same
+author, which is under the same licence.
