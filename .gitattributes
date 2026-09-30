@@ -1,9 +1,9 @@
-# Zeilenenden festnageln. Die Bibliothek wird auf Windows entwickelt und in
-# Linux-Containern gebaut; ohne diese Datei hängt es an der lokalen
-# core.autocrlf-Einstellung, ob ein Commit CRLF in das Repository trägt.
+# Pin down the line endings. The library is developed on Windows and built in
+# Linux containers; without this file it depends on the local core.autocrlf
+# setting whether a commit carries CRLF into the repository.
 #
-# `* text=auto` normalisiert alles, was Git für Text hält, im Repository auf LF.
-# Die Auszeichnungen darunter nehmen die Heuristik aus dem Spiel.
+# `* text=auto` normalises everything Git considers text to LF in the
+# repository. The entries below take the heuristic out of the equation.
 
 * text=auto
 
@@ -25,11 +25,10 @@ library.properties text eol=lf
 .editorconfig text eol=lf
 .gitattributes text eol=lf
 
-# keywords.txt braucht echte Tabulatoren; die IDE trennt daran und ignoriert
-# eine Zeile mit Leerzeichen stillschweigend. Die Zeile steht hier trotzdem nur
-# wegen der Zeilenenden -- Tabulatoren kann .gitattributes nicht schützen, das
-# tut tools/ci.sh lint.
+# keywords.txt needs real tabs; the IDE splits on them and silently ignores a
+# line that uses spaces. This entry is here only for the line endings, though --
+# .gitattributes cannot protect tabs, tools/ci.sh lint does that.
 *.txt  text eol=lf
 
-# PowerShell erwartet CRLF.
+# PowerShell expects CRLF.
 *.ps1  text eol=crlf

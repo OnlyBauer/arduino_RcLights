@@ -1,14 +1,14 @@
-# Formatvorgabe für arduino_rclights, geprüft von tools/ci.sh lint und der
-# Stufe lint in .gitlab-ci.yml.
+# Formatting rules for arduino_rclights, enforced by tools/ci.sh lint and by the
+# lint stage in .gitlab-ci.yml.
 #
-# Wortgleich übernommen aus arduino_crsf, absichtlich und ohne Anpassung: die
-# vier Repositories dieses Projekts werden von derselben Person gepflegt und oft
-# am selben Tag angefasst. Ein Stil, der sich zwischen ihnen unterscheidet,
-# erzeugt bei jedem Wechsel Diff-Rauschen, das nichts bedeutet. Die Begründungen
-# unten stammen aus der Messung dort und gelten hier unverändert.
+# Taken over word for word from arduino_crsf, deliberately and without
+# adjustment: the four repositories of this project are maintained by the same
+# person and often touched on the same day. A style that differs between them
+# produces diff noise on every switch that means nothing. The reasoning below
+# comes from the measurements made there and holds here unchanged.
 #
-# Der Stil in einem Satz: Linux-Klammern, vier Leerzeichen, Stern am Namen,
-# kein automatischer Umbruch.
+# The style in one sentence: Linux braces, four spaces, star on the name, no
+# automatic wrapping.
 
 BasedOnStyle: LLVM
 
@@ -16,61 +16,60 @@ IndentWidth: 4
 TabWidth: 4
 UseTab: Never
 
-# Kein Zeilenlimit, also bricht clang-format nichts um, was schon umgebrochen
-# ist. Das ist der wichtigste Schalter hier: mit einem Limit formatiert das
-# Werkzeug jeden Ausdruck neu nach eigenem Geschmack und der Umbau wird groß,
-# ohne dass eine Zeile dadurch besser lesbar würde. Die Zeilenlänge bleibt
-# damit Sache des Autors — der Bestand liegt bis auf zwei Dateien unter 100
-# Spalten und soll das auch bleiben.
+# No column limit, so clang-format does not re-wrap anything that is already
+# wrapped. This is the most important switch here: with a limit, the tool
+# reformats every expression to its own taste and the change becomes large
+# without a single line getting easier to read. Line length stays the author's
+# business -- the existing code is under 100 columns bar two files, and is meant
+# to stay that way.
 ColumnLimit: 0
 
-# Funktionsrumpf-Klammer auf eigener Zeile, Kontrollfluss-Klammer dahinter.
+# Function body brace on its own line, control flow brace on the same line.
 BreakBeforeBraces: Linux
 
-# uint8_t *out, nicht uint8_t* out.
+# uint8_t *out, not uint8_t* out.
 PointerAlignment: Right
 ReferenceAlignment: Right
 
-# Die Include-Reihenfolge ist gewollt (eigener Header zuerst, dann System),
-# clang-format soll sie nicht alphabetisch umsortieren.
+# The include order is intentional (own header first, then system), and
+# clang-format is not to sort it alphabetically.
 SortIncludes: Never
 
-# Auch ein einzeiliger Rumpf gehört bei einer Funktion auf eigene Zeilen; die
-# kurze Form `if (!r) { return false; }` bei Wächtern bleibt dagegen erlaubt.
-# Abweichung von den drei Schwesterprojekten, und die einzige.
+# A one-line body belongs on its own lines for a function; the short form
+# `if (!r) { return false; }` for guards stays allowed. This is a departure from
+# the three sister projects, and the only one.
 #
-# clang-format kennt kein eigenes "C": .c und .cpp werden beide als Cpp
-# formatiert, eine sprachabhaengige Sektion gibt es also nicht. Der eigene
-# Code dieses Repositories ist vollstaendig C++ -- der eingebettete Kern wird
-# ohnehin nicht geprueft -- weshalb die Einstellung hier ohne Nebenwirkung
-# umgestellt werden kann.
+# clang-format has no separate "C": .c and .cpp are both formatted as Cpp, so
+# there is no language-dependent section. This repository's own C++ is confined
+# to the Arduino wrapper, which is why the setting can be changed here without
+# side effects on the C core.
 #
-# Mit None wird aus jedem der rund fuenfzehn trivialen Accessoren in
-# CRSFv3.h ein Vierzeiler. Das ist fuer C richtig, wo es keine gibt, und
-# macht ausgerechnet die Datei unleserlich, die das Aushaengeschild der
-# Bibliothek ist. Inline laesst nur *in* einer Klasse definierte Kurzmethoden
-# auf einer Zeile; freistehende Funktionen bleiben aufgeklappt wie ueberall.
+# With None, each of the trivial accessors in RcLights.h becomes a four-liner.
+# That is right for C, which has none, and it makes the very file that is the
+# library's shop window unreadable. Inline leaves only short methods defined
+# *inside* a class on one line; free-standing functions stay expanded as
+# everywhere else.
 AllowShortFunctionsOnASingleLine: Inline
 
-# public:/private: auf der Ebene der Klasse statt zwei Spalten eingerueckt.
+# public:/private: at the level of the class rather than indented two columns.
 AccessModifierOffset: -4
 AllowShortBlocksOnASingleLine: Always
 AllowShortIfStatementsOnASingleLine: WithoutElse
 AllowShortLoopsOnASingleLine: false
 AllowShortCaseLabelsOnASingleLine: false
 
-# (uint8_t)x, nicht (uint8_t) x.
+# (uint8_t)x, not (uint8_t) x.
 SpaceAfterCStyleCast: false
 
-# case auf der Höhe des switch, wie im Bestand.
+# case at the height of the switch, as in the existing code.
 IndentCaseLabels: false
 IndentGotoLabels: false
 IndentPPDirectives: None
 
-# Ausrichtung nicht erzwingen: der Bestand richtet `=` in manchen Blöcken
-# bewusst aus und in anderen bewusst nicht. Ein globales Consecutive hat den
-# Umbau messbar vergrößert (15 % -> 17 %), weil es die nicht ausgerichteten
-# Stellen umschreibt. Wo Ausrichtung Absicht ist, steht sie unter
+# Do not force alignment: the existing code aligns `=` in some blocks
+# deliberately and deliberately does not in others. A global Consecutive
+# measurably enlarged the reformatting (15 % -> 17 %), because it rewrites the
+# places that are not aligned. Where alignment is intentional, it sits under
 # `clang-format off`.
 AlignConsecutiveAssignments: None
 AlignConsecutiveDeclarations: None
@@ -80,15 +79,15 @@ AlignEscapedNewlines: Left
 AlignAfterOpenBracket: Align
 AlignOperands: Align
 
-# Kommentare nicht neu umbrechen. Die Dateien sind stark kommentiert, oft mit
-# Absätzen, Aufzählungen und Spaltentabellen darin; ein Reflow zerlegt die.
+# Do not re-wrap comments. The files are heavily commented, often with
+# paragraphs, lists and column tables inside them; a reflow takes those apart.
 ReflowComments: false
 
-# Argumente und Parameter dicht packen statt einen pro Zeile.
+# Pack arguments and parameters densely rather than one per line.
 BinPackArguments: true
 BinPackParameters: true
 
-# Leerzeile am Blockanfang entfernen, mehrfache Leerzeilen auf eine begrenzen.
+# Remove a blank line at the start of a block, limit repeated blank lines to one.
 KeepEmptyLinesAtTheStartOfBlocks: false
 MaxEmptyLinesToKeep: 1
 
