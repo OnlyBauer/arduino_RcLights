@@ -73,8 +73,15 @@ lint_hygiene() {
     rc=1
   fi
 
+  # A literal tab in the pattern rather than grep -P '\t'. -P is a GNU
+  # extension that refuses to run outside a unibyte or UTF-8 locale -- on
+  # Cygwin under a Windows-1252 locale it exits non-zero with "supports only
+  # unibyte and UTF-8 locales", which this `if` reads as "no tabs found". The
+  # check then passed locally for everyone and only ever ran in CI, which is
+  # the one place a lint failure is expensive to diagnose.
+  tab=$(printf '\t')
   for f in $(sources); do
-    if grep -nP '\t' "$f" >/dev/null 2>&1; then
+    if grep -n "$tab" "$f" >/dev/null 2>&1; then
       echo "  tab character in $f"; rc=1
     fi
     if grep -n ' $' "$f" >/dev/null 2>&1; then
@@ -124,6 +131,29 @@ lint_examples() {
   return $rc
 }
 
+# Run clang-tidy over one file and, when it is unhappy, say what it said.
+#
+# The diagnostics go to stdout; only "N warnings generated." goes to stderr.
+# Sending stdout to /dev/null -- which this did until a CI run failed with
+# nothing in the log but five warning counts -- throws away the entire content
+# of the failure and keeps the part that carries no information.
+#
+# The command is echoed as well, so that a failure here can be re-run by hand
+# without reading this script first.
+#
+# $1 is the file, everything after it is passed to the compiler.
+tidy() {
+  f=$1
+  shift
+  if out=$(clang-tidy --quiet "$f" -- "$@" 2>&1); then
+    return 0
+  fi
+  echo "  clang-tidy is unhappy with $f"
+  echo "    clang-tidy $f -- $*"
+  printf '%s\n' "$out" | sed 's/^/    /'
+  return 1
+}
+
 stage_lint() {
   rc=0
   banner "lint: hygiene"
@@ -152,15 +182,14 @@ stage_lint() {
     # The core as C, the wrapper and the mock runtime as C++ -- the same split
     # the Arduino build and tests/Makefile use. Checking the core as C++ would
     # report C idioms that do not apply to it.
-    clang-tidy --quiet src/rclights_core.c -- -std=c11 -Isrc >/dev/null || rc=1
-    clang-tidy --quiet src/RcLights.cpp -- -std=c++11 -Isrc \
-        -Itests/arduino_stubs >/dev/null || rc=1
-    clang-tidy --quiet tests/arduino_stubs/arduino_stubs.cpp -- -std=c++11 \
-        -Isrc -Itests -Itests/arduino_stubs >/dev/null || rc=1
-    clang-tidy --quiet tests/test_arduino_port.cpp -- -std=c++11 \
-        -Isrc -Itests -Itests/arduino_stubs >/dev/null || rc=1
-    clang-tidy --quiet tests/test_example_defaults.cpp -- -std=c++11 \
-        -Isrc -Itests -Itests/arduino_stubs -Iexamples/RcLightsCar >/dev/null || rc=1
+    tidy src/rclights_core.c -std=c11 -Isrc || rc=1
+    tidy src/RcLights.cpp -std=c++11 -Isrc -Itests/arduino_stubs || rc=1
+    tidy tests/arduino_stubs/arduino_stubs.cpp -std=c++11 \
+        -Isrc -Itests -Itests/arduino_stubs || rc=1
+    tidy tests/test_arduino_port.cpp -std=c++11 \
+        -Isrc -Itests -Itests/arduino_stubs || rc=1
+    tidy tests/test_example_defaults.cpp -std=c++11 \
+        -Isrc -Itests -Itests/arduino_stubs -Iexamples/RcLightsCar || rc=1
     [ $rc -eq 0 ] && echo "  clang-tidy is happy"
   else
     skip "clang-tidy" "clang-tidy" || rc=1
