@@ -4,21 +4,13 @@
  * @brief Checks that the RcLightsCar example's OPTIONAL block still lists the
  *        library's own defaults.
  *
- * That block exists to show a beginner every setting there is, next to the
- * value the car already uses, so that deleting the whole block changes nothing
- * and keeping one line changes exactly that one thing. The moment a default
- * moves in `rcl_config_default()` and the block does not follow, it stops being
- * documentation and starts being a set of silent overrides — the example would
- * pin the old value while the library had moved on, and nobody would notice
- * because everything still compiles and still drives.
+ * The block shows every setting next to the value already in use, so deleting
+ * it changes nothing. If a default moves and the block does not follow, it
+ * silently becomes a set of overrides instead: everything still compiles and
+ * still drives, and nobody notices.
  *
- * So: run the example's own `setup()`, and require what the controller ends up
- * with to be byte-for-byte what `rcl_config_default()` produces, give or take
- * the three settings the example is supposed to change.
- *
- * The example is compiled here as it ships, `.ino` extension and all; it needs
- * nothing from the Arduino runtime that `arduino_stubs/` does not provide, and
- * it uses no `Serial`.
+ * So run the example's own setup() and require the result to match
+ * rcl_config_default(), bar the settings the example is meant to change.
  */
 
 #include <Arduino.h>
@@ -38,8 +30,7 @@ static void test_optional_block_matches_defaults(void)
     rcl_config_t want;
     rcl_config_default(&want);
 
-    /* The three the example is meant to set. Everything else it writes, it
-     * writes to the value it already had. */
+    /* The ones the example is meant to set. */
     want.esc_mode = ESC_MODE;
     want.aux_mode = CH3_MODE;
 
@@ -48,15 +39,12 @@ static void test_optional_block_matches_defaults(void)
 
     const rcl_config_t &got = lights.config();
 
-    /* Field by field rather than memcmp: a structure with padding has no unique
-     * object representation, so comparing its bytes is not something to build a
-     * test on -- and a byte offset is not a useful thing to report anyway.
+    /* Field by field, not memcmp: a padded structure has no unique object
+     * representation, and a byte offset reports nothing useful.
      *
-     * Which leaves the question of a field nobody listed here. That is what the
-     * size check is for: add a setting to rcl_config_t and this fails, and
-     * whoever added it has to decide whether the example should mention it. It
-     * is a tripwire, not a measurement, so a change in padding or in a field's
-     * width tripping it is the system working. */
+     * The size check covers the field nobody listed here: add a setting and
+     * this fails, and whoever added it decides whether the example mentions it.
+     * A tripwire, so padding tripping it is the system working. */
     CHECK_EQ_INT(sizeof(rcl_config_t), 116,
                  "rcl_config_t has not gained a setting this test does not know of");
 

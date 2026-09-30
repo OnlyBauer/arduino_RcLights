@@ -1,27 +1,16 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /**
  * @file RcLightsCalibrate.ino
- * @brief Measure your receiver, then watch what the controller makes of it.
+ * @brief Measure your receiver, and watch what the controller makes of it.
  *
- * Two things at once, because in practice they are done together:
+ * Records the smallest and largest pulse per channel, so moving every stick to
+ * both stops gives you the endpoints. Prints the drive state and every output
+ * too, which is the quickest way to see why a light is doing what it does.
  *
- *   - **Measure.** It records the smallest and largest pulse it has seen on
- *     each channel, so moving every stick to both stops gives you the endpoint
- *     numbers to paste into your own sketch.
- *   - **Watch.** It prints what the controller currently thinks — the drive
- *     state, the turn signals, every output — so you can see *why* a light is
- *     doing what it is doing, rather than guessing from the LED.
+ * Send `c` with the sticks at rest to take the centres, `r` to measure again.
+ * Nothing is saved: copy the numbers into your own sketch.
  *
- * Send `c` over the serial port with the sticks at rest to take the centres,
- * and `r` to start the measurement again.
- *
- * The numbers are not saved anywhere. Copy them into the `#define`s at the top
- * of your RcLightsCar sketch; writing them to EEPROM or to NVS is a per-board
- * matter this library stays out of.
- *
- * The pins are this board's defaults, which are the same ones RcLightsCar
- * starts from — so a car wired for that sketch can run this one without
- * rewiring anything.
+ * Uses this board's default pins, the same ones RcLightsCar starts from.
  */
 
 #include <RcLights.h>
@@ -47,8 +36,8 @@ void setup()
 {
     Serial.begin(115200);
     while (!Serial && millis() < 3000) {
-        /* Wait for a native-USB port to come up, but not forever: a car on the
-         * bench has no serial monitor attached and must still light up. */
+        /* Wait for a native-USB port, but not forever: a car on the bench has
+         * no serial monitor and must still light up. */
     }
 
     if (!lights.begin()) {

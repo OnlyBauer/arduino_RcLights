@@ -1,44 +1,22 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /**
  * @file RcLights.h
- * @brief Arduino front end for the RC car light controller.
+ * @brief Arduino front end: capture three receiver channels, drive six PWM
+ *        outputs. Every decision about the lights lives in rclights_core.h.
  *
- * Measures three receiver channels with interrupts, hands them to the portable
- * core in `rclights_core.h`, and writes the six brightness values it gets back
- * out as PWM. That is the whole job; every decision about what the lights do
- * lives in the core and can be read, and tested, without a board.
- *
- * @par The shortest complete sketch
  * @code
- * #include <RcLights.h>
- *
  * RcLights lights;
- *
- * void setup()
- * {
- *     lights.begin();          // default pins for this board
- * }
- *
- * void loop()
- * {
- *     lights.loop();           // call as often as you like
- * }
+ * void setup() { lights.begin(); }
+ * void loop()  { lights.loop(); }
  * @endcode
  *
- * @par One instance
- * The capture runs from interrupt handlers that reach the object through a
- * static pointer, so exactly one RcLights may be `begin()`-ed at a time. A
- * second call to begin() on another object fails and returns false rather than
- * quietly stealing the first one's interrupts.
+ * The interrupt handlers reach the object through a static pointer, so only one
+ * instance may be begin()-ed at a time; a second call returns false.
  *
- * @par AVR and its two interrupt pins
- * An ATmega328P can attach an interrupt to D2 and D3 and to nothing else, which
- * is one short of the three channels this needs. On AVR the library therefore
- * installs its own pin-change interrupt handlers and defines `PCINT0_vect`,
- * `PCINT1_vect` and `PCINT2_vect`. Another library that does the same — several
- * softserial and RC receiver libraries do — will not link alongside it. Define
- * `RCLIGHTS_NO_AVR_PCINT` to fall back to `attachInterrupt()`, and then wire the
- * channels you care about to D2 and D3.
+ * On AVR the library installs its own pin-change handlers and defines
+ * `PCINT0_vect`, `PCINT1_vect` and `PCINT2_vect`, so it will not link alongside
+ * another library that does the same. `RCLIGHTS_NO_AVR_PCINT` falls back to
+ * `attachInterrupt()` on D2 and D3.
  */
 
 #ifndef RCLIGHTS_H
@@ -58,21 +36,10 @@ enum RcLightsOutputs {
 };
 
 /*
- * Short spellings of the values a sketch actually types.
- *
- * The Arduino style guide asks for this: "LONG_CONSTANT_NAMES_FULL_OF_CAPS are
- * hard to read. Try to simplify when possible, without being terse."
- * RCL_AUX_ACTION_LIGHTS_OFF is twenty-five characters of which the first
- * fifteen say nothing to the person typing it.
- *
- * The long names are not deprecated and never will be: they are the C core's,
- * where a prefix is the only namespace there is, and any sketch or port using
- * them keeps working. These are the Arduino-facing spellings, and they are what
- * the examples and the documentation use.
- *
- * `const` at namespace scope has internal linkage in C++, so these cost no
- * storage and cannot collide at link time. tests/test_arduino_port.cpp checks
- * each one against the value it aliases, so a typo here cannot go unnoticed.
+ * Short spellings of the values a sketch types, as the Arduino style guide asks
+ * for. The long RCL_ names are the C core's and keep working; these cost no
+ * storage, and each is checked against what it aliases in
+ * tests/test_arduino_port.cpp.
  */
 
 /** @brief LEDs switched to ground. @see RCLIGHTS_OUTPUTS_ACTIVE_HIGH */
@@ -104,26 +71,19 @@ const rcl_aux_action_t ACTION_LIGHTS_OFF = RCL_AUX_ACTION_LIGHTS_OFF;
 /**
  * @brief Three RC channels in, six light outputs out.
  *
- * @par Settings
- * RcLights *is* an ::rcl_config_t — it derives from one — so every setting the
- * controller has is a field of the object, spelled exactly as that structure
- * spells it:
+ * RcLights derives from ::rcl_config_t, so every setting is a field of the
+ * object, spelled as that structure spells it. There is no second list here to
+ * fall out of step with it.
  *
  * @code
- * lights.esc_mode = RCL_ESC_DIRECT_REVERSE;
+ * lights.esc_mode = ESC_DIRECT_REVERSE;
  * lights.level_rear_brake = 255;
- * lights.cal[RCL_CH_STEER].invert = true;
  * lights.begin();
  * @endcode
  *
- * The constructor fills them in with rcl_config_default(), so a sketch only
- * writes the ones it wants changed. They are read by begin(); to change one
- * while running, write it and call apply().
- *
- * That inheritance is why there is no list of settings here to fall out of date
- * with the controller's: adding a field to ::rcl_config_t adds it to this class
- * at the same moment. The one setting that is not in there is #outputs, because
- * LED polarity is a fact about the wiring rather than about the controller.
+ * The constructor fills them from rcl_config_default(); begin() reads them, and
+ * apply() puts a later change into force. #outputs is the one setting not in
+ * there, because LED polarity describes the wiring, not the controller.
  */
 class RcLights : public rcl_config_t
 {
@@ -134,21 +94,17 @@ public:
     /**
      * @brief Which level lights your LEDs.
      *
-     * Read by every begin(), and applied before the outputs are first driven —
-     * so an active-low string does not flash at full brightness on the way up.
-     * For a car with some LEDs one way round and some the other, leave this at
-     * ::RCLIGHTS_OUTPUTS_ACTIVE_HIGH and call setInvertedOutputs() after
-     * begin().
+     * Applied before the outputs are first driven, so an active-low string does
+     * not flash at full brightness on the way up. For a car wired both ways
+     * round, leave it and call setInvertedOutputs() after begin().
      */
     RcLightsOutputs outputs;
 
     /**
-     * @brief Start with this board's default pins and the settings on the
-     *        object.
+     * @brief Start with this board's default pins and the settings on the object.
      *
-     * Defined here rather than in the library so that a sketch which defines a
-     * pin macro before including this header gets the pin it asked for; see
-     * rclights_board.h.
+     * Defined here, not in the library, so a sketch that #defines a pin macro
+     * above the include gets the pin it asked for.
      *
      * @return true on success; false when the settings do not pass
      *         rcl_config_validate(), or another instance is already running.
@@ -167,11 +123,10 @@ public:
     bool begin(const RcLightsPins &pins);
 
     /**
-     * @brief Start with your own pins and a configuration from somewhere else.
+     * @brief Start with your own pins and settings from elsewhere.
      *
-     * For a sketch that keeps its settings in an ::rcl_config_t of its own — one
-     * read back from EEPROM, say. @p cfg replaces the settings on the object, so
-     * afterwards they read back as what was actually applied.
+     * @p cfg replaces the settings on the object, so they afterwards read back
+     * as what was applied.
      *
      * @param pins Pin assignment.
      * @param cfg Settings, as prepared by rcl_config_default().
@@ -185,9 +140,7 @@ public:
      *
      * For changing something while running: write the field, call this.
      *
-     * @return true when they were accepted; false leaves the running settings
-     *         alone, and the fields then disagree with them until they are
-     *         corrected or apply() succeeds.
+     * @return true when accepted; false leaves the running settings alone.
      */
     bool apply();
 
@@ -201,44 +154,33 @@ public:
     /**
      * @brief Read the channels, advance the controller, write the outputs.
      *
-     * Call from `loop()` as often as convenient. It does not block and does not
-     * need a fixed rate; 100 Hz or better keeps the blink phase and the fade
-     * smooth. Calling it far more often than that costs nothing beyond the
-     * reads, because the core works from the millisecond clock rather than from
-     * a call count.
+     * Does not block and needs no fixed rate; 100 Hz or better keeps the blink
+     * and the fade smooth. The core works from millis(), not from a call count,
+     * so calling it more often costs only the reads.
      */
     void loop();
 
     /**
-     * @brief Replace the settings while running, from somewhere else.
+     * @brief Replace the settings while running, from elsewhere.
      *
-     * Like apply(), but taking the settings as an argument; @p cfg replaces the
-     * fields on the object as well.
+     * Like apply(), but @p cfg replaces the fields on the object as well.
      *
      * @param cfg New settings.
-     * @return true when they were accepted; false leaves the old ones in place.
+     * @return true when accepted; false leaves the old ones in place.
      */
     bool applyConfig(const rcl_config_t &cfg);
 
     /**
      * @brief The settings actually in force.
      *
-     * The same values as the object's own fields, except in the window between
-     * writing a field and calling apply(), and after an apply() that was
-     * refused. Reading this rather than the fields answers "what is the
-     * controller doing", not "what have I asked for".
+     * Differs from the object's fields only between writing one and calling
+     * apply(), and after an apply() that was refused.
      *
      * @return A reference to the live configuration.
      */
     const rcl_config_t &config() const;
 
-    /**
-     * @brief The pin assignment in force.
-     *
-     * Useful mostly to print this board's defaults rather than looking them up.
-     *
-     * @return A read-only reference.
-     */
+    /** @brief The pin assignment in force. @return A read-only reference. */
     const RcLightsPins &pins() const;
 
     /**
@@ -284,10 +226,8 @@ public:
     /**
      * @brief Whether the stick centres are still being measured.
      *
-     * True for the first rcl_config_t::auto_center_ms of signal after the
-     * receiver comes up, during which both sticks read as centred. A sketch
-     * that tells the user what is happening can say so; nothing needs to wait
-     * for it.
+     * True for the first rcl_config_t::auto_center_ms of signal, during which
+     * both sticks read as centred. Nothing needs to wait for it.
      *
      * @return true while either stick is still being measured.
      */
@@ -302,10 +242,8 @@ public:
     /**
      * @brief Invert individual outputs, for a car wired both ways round.
      *
-     * #outputs covers the usual case, where every LED is the same way round.
-     * This is the per-output form: one bit per ::rcl_output_t, bit 0 being
-     * ::RCL_OUT_FRONT. Call it after begin(), which sets the mask from
-     * #outputs.
+     * One bit per ::rcl_output_t, bit 0 being ::RCL_OUT_FRONT. Call it after
+     * begin(), which sets the mask from #outputs.
      *
      * @param mask Bit set per inverted output; 0 for none.
      */
@@ -314,25 +252,21 @@ public:
     /**
      * @brief Set the PWM carrier frequency where the board allows it.
      *
-     * Takes effect at the next begin(). Ignored on AVR, whose PWM frequency is
-     * fixed by the timer prescaler and shared with `millis()`.
+     * Takes effect at the next begin(). Ignored on AVR, where it is fixed by
+     * the timer prescaler.
      *
      * @param hz Frequency in Hz.
      */
     void setPwmFrequency(uint32_t hz);
 
     /**
-     * @brief Take the current stick positions as the centre of steering and
-     *        throttle.
+     * @brief Take the stick positions as the centre of steering and throttle.
      *
-     * Hold the transmitter sticks at rest and call this once. Only those two
-     * channels are touched — channel 3 is a switch and has no centre — and only
-     * the centres move; the endpoints stay as configured. Nothing is stored
-     * anywhere, so a sketch that wants this to survive a power cycle has to save
-     * the configuration itself.
+     * Only those two are touched; channel 3 is a switch and has no centre. Only
+     * the centres move, and nothing is stored, so a sketch that wants this to
+     * survive a power cycle saves the configuration itself.
      *
-     * @return true when both channels were live and the centres were taken;
-     *         false leaves the calibration untouched.
+     * @return true when both channels were live and the centres were taken.
      */
     bool captureCenter();
 
@@ -399,11 +333,8 @@ private:
 
 public:
     /**
-     * @brief Entry point for the AVR pin-change vectors.
-     *
-     * Public only because the `ISR()` macro expands to a free function that has
-     * to be able to call it. Not part of the interface; do not call it.
-     *
+     * @brief Entry point for the AVR pin-change vectors. Not part of the
+     *        interface; public only because ISR() expands to a free function.
      * @param port 0 for PORTB, 1 for PORTC, 2 for PORTD.
      */
     static void avrIsrEntry(uint8_t port);

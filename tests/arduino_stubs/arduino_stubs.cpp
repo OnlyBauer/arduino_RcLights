@@ -36,10 +36,8 @@ void edge(uint8_t pin, uint8_t level)
     if (g_level[pin] == level)
         return;
     g_level[pin] = level;
-    /* An interrupt raised while they are masked is delivered when they are
-     * enabled again on real hardware. Here it is dropped, which is the harsher
-     * of the two: a test that manages to lose a pulse that way fails rather
-     * than passing by luck. */
+    /* Real hardware would deliver this once interrupts are enabled again;
+     * dropping it is harsher, so a test that loses a pulse fails. */
     if (!g_masked && g_isr[pin])
         g_isr[pin]();
 }
@@ -116,9 +114,8 @@ void mock_reset(void)
     memset(g_level, 0, sizeof(g_level));
     memset(g_written, 0, sizeof(g_written));
     memset(g_writes, 0, sizeof(g_writes));
-    /* A loop rather than memset: an array of function pointers is not
-     * guaranteed to be all-bits-zero when null, and clang-tidy is right to say
-     * so even though every target here would have been fine. */
+    /* A loop, not memset: a null function pointer is not guaranteed to be
+     * all-bits-zero. */
     for (size_t i = 0; i < MOCK_PIN_COUNT; i++)
         g_isr[i] = nullptr;
 }

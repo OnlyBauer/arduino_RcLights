@@ -58,11 +58,9 @@ sources() {
   git ls-files '*.c' '*.cpp' '*.h' '*.ino'
 }
 
-# Whitespace and line endings, checked against the *index* rather than the
-# working tree. That is the point: with core.autocrlf=true -- the default on
-# Windows, where this is developed -- every file on disk has CRLF even though
-# the repository holds LF. A grep over the files on disk would fire on exactly
-# the machine this is developed on, and would therefore be useless.
+# Checked against the index, not the working tree: with core.autocrlf=true every
+# file on disk has CRLF even though the repository holds LF, so a check over the
+# working tree would fire on the machine this is developed on.
 lint_hygiene() {
   rc=0
   bad=$(git ls-files --eol -- '*.c' '*.cpp' '*.h' '*.ino' '*.md' '*.yml' '*.py' '*.sh' \
@@ -73,12 +71,8 @@ lint_hygiene() {
     rc=1
   fi
 
-  # A literal tab in the pattern rather than grep -P '\t'. -P is a GNU
-  # extension that refuses to run outside a unibyte or UTF-8 locale -- on
-  # Cygwin under a Windows-1252 locale it exits non-zero with "supports only
-  # unibyte and UTF-8 locales", which this `if` reads as "no tabs found". The
-  # check then passed locally for everyone and only ever ran in CI, which is
-  # the one place a lint failure is expensive to diagnose.
+  # A literal tab rather than grep -P '\t': -P refuses to run outside a UTF-8
+  # locale and exits non-zero, which this `if` would read as "no tabs found".
   tab=$(printf '\t')
   for f in $(sources); do
     if grep -n "$tab" "$f" >/dev/null 2>&1; then
@@ -89,9 +83,8 @@ lint_hygiene() {
     fi
   done
 
-  # keywords.txt is the opposite case: the Arduino IDE splits its fields on a
-  # literal tab and silently ignores any line that uses spaces, so a file that
-  # someone has "tidied" highlights nothing and says nothing about it.
+  # The opposite case: the Arduino IDE splits keywords.txt on tabs and silently
+  # ignores any line using spaces, so a "tidied" file highlights nothing.
   if [ -f keywords.txt ]; then
     if grep -nE '^[A-Za-z_][A-Za-z0-9_]* +(KEYWORD|LITERAL)' keywords.txt >/dev/null 2>&1; then
       echo "  keywords.txt has entries separated by spaces instead of a tab"
@@ -102,8 +95,7 @@ lint_hygiene() {
 }
 
 # The version is written in three places and they must agree. The Doxyfile is
-# explicitly one of them: that is where esp_crsf's version sat unnoticed at
-# 0.3.0 while its manifest said 1.0.0, because nothing ever read it.
+# one of them: that is where esp_crsf's version sat unnoticed at 0.3.0.
 lint_versions() {
   p=$(sed -n 's/^version=//p' library.properties)
   j=$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' library.json)
@@ -115,9 +107,9 @@ lint_versions() {
   return $rc
 }
 
-# The Arduino 1.5 library format requires examples/<Name>/<Name>.ino. A sketch
-# whose folder and file disagree is silently not offered in the IDE's menu --
-# arduino-lint catches it too, but this runs without a download.
+# examples/<Name>/<Name>.ino: a sketch whose folder and file disagree is
+# silently missing from the IDE's menu. arduino-lint catches it too, but this
+# needs no download.
 lint_examples() {
   rc=0
   for d in examples/*/; do
@@ -131,25 +123,10 @@ lint_examples() {
   return $rc
 }
 
-# Run clang-tidy over one file and, when it is unhappy, say what it said.
-#
-# The diagnostics go to stdout; only "N warnings generated." goes to stderr.
-# Sending stdout to /dev/null -- which this did until a CI run failed with
-# nothing in the log but five warning counts -- throws away the entire content
-# of the failure and keeps the part that carries no information.
-#
-# The command is echoed as well, so that a failure here can be re-run by hand
-# without reading this script first.
-#
-# The header filter is passed explicitly rather than left to the
-# HeaderFilterRegex in .clang-tidy. Both should mean the same thing, and in CI
-# they do; under the clang-tidy build used on the development machine the value
-# from the configuration file is loaded -- `clang-tidy --dump-config` prints it
-# -- and then not applied, so every finding in this library's own headers was
-# invisible locally and fired only in CI. Passing it on the command line makes
-# the two agree whatever the local build does. The value still lives in
-# .clang-tidy, so editors and IDE integrations keep using it, and this reads it
-# from there rather than holding a second copy to drift.
+# Passed explicitly rather than left to HeaderFilterRegex in .clang-tidy: at
+# least one clang-tidy build loads that value and then does not apply it, which
+# made every finding in this library's headers invisible locally while firing in
+# CI. Read from .clang-tidy so there is still one source of truth.
 tidy_header_filter() {
   hf=$(sed -n "s/^HeaderFilterRegex:[[:space:]]*'\(.*\)'[[:space:]]*$/\1/p" .clang-tidy)
   if [ -z "$hf" ]; then
@@ -159,6 +136,11 @@ tidy_header_filter() {
   printf '%s' "$hf"
 }
 
+# Run clang-tidy over one file and, when it is unhappy, say what it said. The
+# diagnostics go to stdout and only "N warnings generated." to stderr, so
+# discarding stdout throws away the whole content of a failure. The command is
+# echoed too, so a failure can be re-run by hand.
+#
 # $1 is the file, everything after it is passed to the compiler.
 tidy() {
   f=$1
@@ -219,24 +201,14 @@ stage_lint() {
 
 # --- arduino-lint -------------------------------------------------------------
 
-# The Arduino library specification, checked with Arduino's own tool. This is
-# the check that decides whether the library can be published at all, so it is
-# worth having locally rather than only in the registry's pull request.
+# The Arduino library specification, checked with Arduino's own tool.
 #
-# It runs against a copy of the *tracked* files rather than against the working
-# tree, and that is the whole reason this stage exists as more than one line.
-# Rule LS007 fails on any .exe inside the library, because the Library Manager
-# indexer refuses one -- and on Windows the host test binaries in build_tests/
-# are .exe files. Linting the working tree therefore reports an error about
-# files that are git-ignored, have never been committed and will never reach the
-# registry. What the registry actually judges is a tag: tracked files and
-# nothing else, which is what gets copied here.
+# Run against a copy of the tracked files, not the working tree: rule LS007
+# fails on any .exe in the library, and on Windows the host test binaries in
+# build_tests/ are .exe files -- git-ignored, and invisible to the registry,
+# which judges a tag. Working-tree content, so uncommitted work is checked.
 #
-# Working-tree content of those files, not HEAD's, so that uncommitted work is
-# checked like it is by every other stage.
-#
-# LIBRARY_MANAGER_MODE mirrors the variable in .gitlab-ci.yml; see the comment
-# on that job for why the two modes are not interchangeable.
+# LIBRARY_MANAGER_MODE mirrors the variable in .gitlab-ci.yml.
 stage_arduino_lint() {
   banner "arduino-lint"
   if ! have arduino-lint; then

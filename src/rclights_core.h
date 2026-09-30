@@ -4,45 +4,21 @@
  * @brief Board-independent light controller for an RC car, driven by three RC
  *        channels.
  *
- * Everything this library actually decides happens here, in plain C11 with no
- * Arduino, no timers and no I/O. The caller measures three servo pulses, hands
- * them in together with a millisecond clock, and reads six brightness values
- * back out. That split is not decoration: the whole behaviour — the brake and
- * reverse state machine, the turn signal arming rule, the blink phase, the
- * failsafe — is reachable from a host test without a board, and
- * `tests/test_core.c` drives it that way.
+ * Plain C11: no Arduino, no timers, no I/O. The caller measures three servo
+ * pulses, hands them in with a millisecond clock, and reads six brightness
+ * values back. Every decision the lights make is therefore reachable from a
+ * host test without a board, which is what tests/test_core.c does.
  *
- * @par The model
- * Three inputs, six outputs:
+ * Channel 1 is steering and drives the turn signals, channel 2 is throttle and
+ * drives brake, reverse and the driving light, channel 3 is a switch
+ * (::rcl_aux_mode_t).
  *
- * | Channel | Meaning |
- * | --- | --- |
- * | ::RCL_CH_STEER | steering, drives the turn signals |
- * | ::RCL_CH_THROTTLE | throttle, drives brake, reverse and the driving light |
- * | ::RCL_CH_AUX | a switch, see ::rcl_aux_mode_t |
+ * Pulse widths are microseconds. Stick positions are normalised to
+ * ±#RCL_UNIT, so a threshold means the same on every transmitter. Brightness
+ * is 0..255 whatever PWM resolution the board uses.
  *
- * | Output | Behaviour |
- * | --- | --- |
- * | ::RCL_OUT_FRONT | one LED: park level standing, brighter while driving |
- * | ::RCL_OUT_REAR | one LED: park level standing, brighter while braking |
- * | ::RCL_OUT_REVERSE | on while the drive state is ::RCL_DRIVE_REVERSE |
- * | ::RCL_OUT_TURN_LEFT | blinks |
- * | ::RCL_OUT_TURN_RIGHT | blinks |
- * | ::RCL_OUT_AUX | on while the aux switch selects ::RCL_AUX_ACTION_AUX |
- *
- * @par Units
- * Pulse widths are microseconds, as measured. Stick positions are normalised to
- * ±#RCL_UNIT so that a threshold in the configuration means the same thing on
- * every transmitter, whatever its endpoints. Brightness is 0..255 regardless of
- * the PWM resolution the board ends up using; scaling to the hardware is the
- * Arduino layer's job.
- *
- * @par What this cannot know
- * There is no speed sensor. "Rolling" is inferred from the throttle history
- * (rcl_config_t::coast_ms), which is what a two-wire light controller has to do
- * and what every commercial one does. A car that is pushed, or that coasts for
- * longer than the configured window, is indistinguishable from one standing
- * still.
+ * There is no speed sensor: "rolling" is inferred from the throttle history
+ * over rcl_config_t::coast_ms, so a car being pushed reads as standing still.
  */
 
 #ifndef RCLIGHTS_CORE_H
@@ -64,19 +40,16 @@ extern "C" {
 /**
  * @brief How far the readings may spread during automatic centring, in µs.
  *
- * A stick at rest jitters by a few microseconds. One that is being held moves
- * by hundreds, so anything wider than this is taken as "the stick was not at
- * rest" and the measurement is thrown away.
+ * A stick at rest jitters by a few microseconds; one being moved does not, so
+ * anything wider means the measurement is thrown away.
  */
 #define RCL_CENTER_SPREAD_US 40
 
 /**
  * @brief How far automatic centring may move a centre, in µs.
  *
- * Trim on a transmitter is worth a few tens of microseconds, and a receiver
- * that is out by more than this is not mistrimmed — it is a stick being held.
- * A held stick does not move, so the spread check above cannot see it; this is
- * what stops full throttle at power-up from being calibrated as neutral.
+ * Trim is worth a few tens of microseconds; more than this is a stick being
+ * held. A held stick does not move, so the spread check cannot catch it.
  */
 #define RCL_CENTER_MAX_SHIFT_US 200
 
@@ -113,16 +86,13 @@ typedef enum {
  */
 typedef enum {
     /**
-     * Brake, neutral, then reverse — the usual car ESC. A backwards stick while
-     * the car is still rolling is braking, and reverse is only entered after the
-     * stick has passed through neutral. Matches what the car does, so the
-     * reversing light does not come on during a braking manoeuvre.
+     * Brake, neutral, then reverse: the usual car ESC. A backwards stick while
+     * rolling is braking, so the reversing light stays off during a braking
+     * manoeuvre.
      */
     RCL_ESC_BRAKE_THEN_REVERSE = 0,
-    /**
-     * Brake while rolling, then reverse without passing through neutral —
-     * crawler and many brushless ESCs in "no delay" mode.
-     */
+    /** Brake while rolling, then reverse without neutral: crawlers, and many
+     * brushless ESCs in "no delay" mode. */
     RCL_ESC_DIRECT_REVERSE
 } rcl_esc_mode_t;
 
@@ -151,12 +121,10 @@ typedef enum {
 } rcl_turn_t;
 
 /**
- * @brief Endpoints of one channel, as measured with rcl_normalize().
+ * @brief Endpoints of one channel, as used by rcl_normalize().
  *
- * The defaults describe a nominal 1000/1500/2000 µs channel. Real receivers and
- * real transmitter endpoints differ by tens of microseconds, which is why the
- * two halves are scaled separately: a stick whose centre is not the arithmetic
- * mean of its endpoints still reads 0 at rest and ±#RCL_UNIT at the stops.
+ * The two halves are scaled separately, so a stick whose centre is not the mean
+ * of its endpoints still reads 0 at rest and ±#RCL_UNIT at the stops.
  */
 typedef struct {
     uint16_t min_us;    /**< Pulse at full deflection one way. */
@@ -168,9 +136,8 @@ typedef struct {
 /**
  * @brief Everything adjustable, in one place.
  *
- * Fill it with rcl_config_default() and change what needs changing; every field
- * is checked by rcl_config_validate(), which rcl_init() calls, so a nonsense
- * value is refused rather than acted on.
+ * Fill it with rcl_config_default() and change what needs changing.
+ * rcl_init() validates it, so a nonsense value is refused rather than acted on.
  */
 typedef struct {
     /** @brief Endpoints per channel, indexed by ::rcl_channel_t. */
@@ -185,27 +152,21 @@ typedef struct {
     /**
      * @brief Silence on a channel for this long means the link is gone.
      *
-     * Only channels that are actually used count: ::RCL_CH_AUX is exempt while
-     * rcl_config_t::aux_mode is ::RCL_AUX_MODE_OFF, so a two-channel receiver
-     * does not sit in permanent failsafe.
+     * ::RCL_CH_AUX is exempt while #aux_mode is ::RCL_AUX_MODE_OFF, so a
+     * two-channel receiver does not sit in permanent failsafe.
      */
     uint32_t signal_timeout_ms;
     /** @brief Blink the hazards on signal loss rather than going dark. */
     bool failsafe_hazard;
     /**
-     * @brief Take each stick's rest position as its centre over this many
-     *        milliseconds of signal, 0 to use rcl_cal_t::center_us as given.
+     * @brief Measure each stick's rest position over this many milliseconds of
+     *        signal; 0 uses rcl_cal_t::center_us as given.
      *
-     * The window opens on the first valid pulse each of the steering and
-     * throttle channels produces — not at power-up, so it still works when the
-     * car is switched on before the transmitter. Until it closes, both sticks
-     * read as centred, so nothing acts on a stick position that has not been
-     * calibrated yet.
-     *
-     * A stick that moves during the window is spotted and the measurement
-     * discarded: if the readings spread by more than #RCL_CENTER_SPREAD_US the
-     * configured centre is kept instead. That is what keeps a car whose
-     * throttle was held at power-up from calibrating half throttle as neutral.
+     * The window opens on the first valid pulse, not at power-up, so switching
+     * the car on before the transmitter still works. Both sticks read as centred
+     * until it closes. A measurement that spreads by more than
+     * #RCL_CENTER_SPREAD_US, or lands more than #RCL_CENTER_MAX_SHIFT_US from
+     * the configured centre, is discarded.
      */
     uint32_t auto_center_ms;
 
@@ -218,18 +179,15 @@ typedef struct {
     /**
      * @brief Steering below this magnitude ends a running turn signal.
      *
-     * Lower than rcl_config_t::steer_trigger on purpose: without that
-     * hysteresis, holding the stick near the trigger point makes the signal
-     * stutter on and off.
+     * Lower than #steer_trigger on purpose: without the hysteresis, holding the
+     * stick near the trigger point makes the signal stutter.
      */
     int16_t steer_release;
     /**
      * @brief How long the steering must have been centred before a deflection
      *        counts as indicating.
      *
-     * This is what separates "turning a corner" from "correcting the line".
-     * Countersteering out of a slide never passes through a long enough centre,
-     * so it does not set the indicator flashing.
+     * What separates turning a corner from correcting the line.
      */
     uint32_t center_hold_ms;
     /** @brief Once started, a turn signal runs at least this long. */
@@ -248,12 +206,10 @@ typedef struct {
     /** @brief Which reverse behaviour the ESC has. */
     rcl_esc_mode_t esc_mode;
     /**
-     * @brief How long the car is assumed to keep rolling after the throttle is
-     *        released.
+     * @brief How long the car is assumed to keep rolling after lift-off.
      *
-     * Stands in for the speed sensor this controller does not have. While the
-     * window is open a backwards stick is braking; once it has run out, the car
-     * is assumed to be standing and the same stick means reverse.
+     * Stands in for the speed sensor there is not. While it runs, a backwards
+     * stick is braking; after it, the same stick means reverse.
      */
     uint32_t coast_ms;
     /** @brief Backwards stick must be held this long before reverse is shown. */
@@ -268,9 +224,7 @@ typedef struct {
     /**
      * @brief What each switch position does: index 0 low, 1 middle, 2 high.
      *
-     * In ::RCL_AUX_MODE_2POS the middle entry is not used. This is the "ON/OFF
-     * or 3-way, hazard or auxiliary" selection: the same switch drives hazards
-     * on one car and a light bar on the next, without a code change.
+     * The middle entry is unused in ::RCL_AUX_MODE_2POS.
      */
     rcl_aux_action_t aux_action[3];
     /** @brief Channel 3 at or below this is the low position. */
@@ -297,14 +251,12 @@ typedef struct {
     /** @brief Park and tail light on whenever the link is up. */
     bool park_lights_on;
     /**
-     * @brief Brightness steps per 10 ms for the front and rear LED, 0 for an
-     *        instant change.
+     * @brief Brightness steps per 10 ms for the front and rear LED; 0 is
+     *        instant.
      *
-     * Only those two fade. A brake light that fades in is a brake light that
-     * tells the car behind too late, so 255 (instant) is a legitimate setting;
-     * the default fades over about 60 ms, which reads as an incandescent bulb
-     * rather than as a delay. The turn signals, the reversing light and the
-     * auxiliary output always switch instantly.
+     * Only those two fade; the turn signals, reversing light and auxiliary
+     * output always switch instantly. The default takes about 60 ms, which
+     * reads as a bulb warming rather than as a delay.
      */
     uint8_t fade_step;
 } rcl_config_t;
@@ -318,9 +270,8 @@ typedef struct {
     /**
      * @brief Whether that measurement is new since the previous rcl_update().
      *
-     * The core needs the distinction to run its own timeout: a channel that
-     * keeps reporting its last value forever is exactly what a dead receiver
-     * output looks like.
+     * Needed for the timeout: a channel repeating its last value forever is
+     * what a dead receiver output looks like.
      */
     bool fresh[RCL_CH_COUNT];
 } rcl_input_t;

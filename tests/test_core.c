@@ -1,17 +1,11 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /**
  * @file test_core.c
- * @brief Host tests for the board-independent controller in rclights_core.c.
+ * @brief Host tests for the controller in rclights_core.c.
  *
- * Every case here is a sequence of stick positions and a clock, because that is
- * all the core has: there is no board, no interrupt and no pin. The clock is
- * stepped in 10 ms slices, close to how often a sketch actually calls
- * rcl_update(), so a threshold that only works at an unrealistic update rate
- * would show up here.
- *
- * Pulse widths are written out as microseconds rather than as normalised units,
- * so a case reads the way it would be flown: 1500 is centre, 1900 is nearly
- * full right, 1100 nearly full back.
+ * Each case is a sequence of stick positions and a clock, stepped in 10 ms
+ * slices so that a threshold needing an unrealistic update rate shows up here.
+ * Pulse widths are microseconds, so a case reads the way it would be flown.
  */
 
 #include "rclights_core.h"
@@ -207,8 +201,8 @@ static void test_reverse_needs_neutral(void)
     boot(&st, NULL);
 
     run(&st, US_CENTER, US_FORWARD, US_SW_LOW, 500);
-    /* Hold the stick back without ever letting go: coast runs out, but this is
-     * still a car standing on its brakes, not a car reversing. */
+    /* Held back without letting go: coast runs out, but this is a car standing
+     * on its brakes, not reversing. */
     run(&st, US_CENTER, US_BACK, US_SW_LOW, 3000);
     CHECK_EQ_INT(st.drive, RCL_DRIVE_BRAKE, "held brake never becomes reverse");
     CHECK_EQ_INT(rcl_output(&st, RCL_OUT_REVERSE), 0, "reversing light stays off");
@@ -249,8 +243,8 @@ static void test_turn_arming(void)
     rcl_config_t cfg;
     rcl_config_default(&cfg);
 
-    /* Case one: steer before the centre hold (400 ms) has elapsed. This is the
-     * mid-corner correction the feature exists to ignore. */
+    /* Steering before the centre hold has elapsed: the mid-corner correction
+     * the feature exists to ignore. */
     g_now = 1000;
     CHECK(rcl_init(&st, &cfg, g_now), "init");
     run(&st, US_CENTER, US_CENTER, US_SW_LOW, 200);
@@ -280,10 +274,8 @@ static void test_turn_arming(void)
     CHECK_EQ_INT(st.turn, RCL_TURN_NONE, "and then it stops");
     CHECK_EQ_INT(rcl_output(&st, RCL_OUT_TURN_RIGHT), 0, "lamp out");
 
-    /* Re-arming: a deflection straight after the signal ended does nothing,
-     * because the wheel has not been centred long enough again. The 1500 ms of
-     * straight running above did centre it, so steer the other way immediately
-     * after a short centre instead. */
+    /* The 1500 ms of straight running above re-armed it, so the other side
+     * indicates immediately. */
     run(&st, US_LEFT, US_CENTER, US_SW_LOW, 50);
     CHECK_EQ_INT(st.turn, RCL_TURN_LEFT, "the other side indicates when armed");
 }
@@ -396,7 +388,7 @@ static void test_failsafe(void)
     CHECK(rcl_output(&st, RCL_OUT_TURN_LEFT) == rcl_output(&st, RCL_OUT_TURN_RIGHT),
           "the hazards blink together");
 
-    /* And it recovers on its own when the receiver comes back. */
+    /* And recovers on its own. */
     run(&st, US_CENTER, US_CENTER, US_SW_LOW, 100);
     CHECK(!st.failsafe, "the link coming back clears it");
     CHECK_EQ_INT(rcl_output(&st, RCL_OUT_REAR), 30, "park lights return");

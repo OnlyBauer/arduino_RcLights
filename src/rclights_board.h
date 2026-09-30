@@ -1,31 +1,15 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /**
  * @file rclights_board.h
- * @brief Pin assignment, default pin maps per board, and the PWM and interrupt
- *        facts that differ between them.
+ * @brief Default pin maps, and the PWM and interrupt facts that differ between
+ *        boards.
  *
- * The library is meant to run unchanged on an Arduino Nano, an ST Nucleo and an
- * ESP32 DevKit ("DOIT"). What actually differs between those three is small and
- * is all collected here:
+ * An ATmega328P can attach an interrupt to two pins and this needs three, which
+ * is why AVR gets its own pin-change capture (see RcLights.cpp) and why the Nano
+ * map uses pins other than D2 and D3 for the inputs.
  *
- * | | Nano (AVR) | Nucleo (STM32) | ESP32 DevKit |
- * | --- | --- | --- | --- |
- * | PWM resolution | 8 bit | 8..16 bit, settable | 8..14 bit via LEDC |
- * | `analogWrite()` on any pin | no, six fixed pins | most pins | yes (core 3.x) |
- * | `attachInterrupt()` on any pin | **no**, only D2/D3 | yes | yes |
- * | PWM frequency settable | no | yes | yes |
- *
- * The interrupt row is the one that decides the design. Three receiver channels
- * need three edge-triggered inputs, and an ATmega328P has two external interrupt
- * pins. RcLights therefore brings its own pin-change interrupt capture for AVR
- * (see `RcLights.cpp`), which is why the Nano map below may use pins other than
- * D2 and D3 for the inputs.
- *
- * @par Choosing your own pins
- * The defaults are a starting point, not a requirement. Fill an
- * ::RcLightsPins yourself and pass it to `RcLights::begin()`; anything set to
- * #RCLIGHTS_PIN_NONE is simply not driven, so a car without a reversing light
- * or without an auxiliary output needs no other change.
+ * The defaults are a starting point. Fill an ::RcLightsPins yourself and pass it
+ * to `RcLights::begin()`; #RCLIGHTS_PIN_NONE means "not driven".
  */
 
 #ifndef RCLIGHTS_BOARD_H
@@ -36,13 +20,7 @@
 /** @brief An output or input that is not connected. */
 #define RCLIGHTS_PIN_NONE (-1)
 
-/**
- * @brief Which pin carries which signal.
- *
- * Every field is an Arduino pin number, or #RCLIGHTS_PIN_NONE. The three inputs
- * are the receiver channels; the six outputs drive the LEDs, through a resistor
- * or a transistor as the current demands.
- */
+/** @brief Which pin carries which signal, as Arduino pin numbers. */
 struct RcLightsPins {
     int16_t ch1;       /**< Receiver channel 1, steering. */
     int16_t ch2;       /**< Receiver channel 2, throttle. */
@@ -56,40 +34,27 @@ struct RcLightsPins {
 };
 
 /*
- * The default pin maps.
+ * The default pin maps. Every input can raise an interrupt, every output has a
+ * PWM timer, and pins commonly wired to something else are avoided.
  *
- * Two rules decided every one of these: an input pin must be able to raise an
- * interrupt, and an output pin must be able to produce PWM. Where a board has
- * more candidates than needed, the ones that clash with something commonly
- * wired (the on-board LED, the boot strapping pins, a debug UART) were left
- * alone.
- *
- * Every pin is a separate macro, and every one is guarded, so a single pin can
- * be moved from the build without touching this file or the sketch:
+ * Each pin is separately guarded, so one can be moved from the build:
  *
  *   platformio.ini   build_flags = -DRCLIGHTS_PIN_FRONT=6
  *   arduino-cli      --build-property "compiler.cpp.extra_flags=-DRCLIGHTS_PIN_FRONT=6"
  *
- * The Arduino IDE has no field for build flags. There, define the macro in the
- * sketch before including RcLights.h and pass RCLIGHTS_PINS_DEFAULT to
- * begin() -- which is what the RcLightsCar example does, so the override works
- * either way round.
+ * The Arduino IDE has no such field; there, #define it in the sketch above the
+ * include, which works because the sketch passes RCLIGHTS_PINS_DEFAULT to
+ * begin().
  */
 
 #if defined(ARDUINO_ARCH_AVR)
 
-/* Nano / Uno / Pro Mini. The six hardware PWM pins are D3, D5, D6, D9, D10 and
- * D11, and all six are outputs here -- which is exactly as many as the library
- * has outputs, so the inputs have to go elsewhere. D4, D7 and D8 are ordinary
- * pins on PORTD/PORTB and are served by the pin-change capture.
+/* Nano / Uno / Pro Mini. The six hardware PWM pins (D3, D5, D6, D9, D10, D11)
+ * are exactly the six outputs, so the inputs go on pins served by the
+ * pin-change capture.
  *
- * Note that D5 and D6 sit on timer0, the same timer millis() uses: their PWM
- * runs at 976 Hz instead of 490 Hz and cannot be changed. Both are LED outputs
- * here, where neither matters.
- *
- * Moving an output to a pin that is not one of those six is the one change
- * that fails quietly: analogWrite() on any other AVR pin is on-or-off, so the
- * light works but never dims. */
+ * Moving an output off those six fails quietly: analogWrite() on any other AVR
+ * pin is on-or-off, so the light works but never dims. */
 
 /** @brief Name of the board family this build targets. */
 #define RCLIGHTS_BOARD_NAME "AVR"
@@ -133,13 +98,9 @@ struct RcLightsPins {
 
 #elif defined(ARDUINO_ARCH_ESP32)
 
-/* ESP32 DevKit v1 ("DOIT", 30 pins). GPIO 34/35/36/39 are input-only and have
- * no pull-ups, which is right for a receiver output driving them: nothing on
- * the board can fight the signal. GPIO 32 completes the three.
- *
- * The outputs avoid the strapping pins (0, 2, 5, 12, 15), the flash pins
- * (6..11, which are not brought out and would brick a running sketch) and the
- * input-only range. */
+/* ESP32 DevKit v1 ("DOIT"). GPIO 34/35 are input-only with no pull-ups, which
+ * suits a receiver output. The outputs avoid the strapping pins (0, 2, 5, 12,
+ * 15) and the flash pins (6..11). */
 
 #define RCLIGHTS_BOARD_NAME "ESP32"
 
@@ -173,12 +134,8 @@ struct RcLightsPins {
 
 #elif defined(ARDUINO_ARCH_STM32)
 
-/* Nucleo-64, Arduino header numbering, so this holds for an F103, an F411 or an
- * L476 alike. Every pin on that header can raise an interrupt and D3, D5, D6,
- * D9, D10 and D11 carry a timer channel on all of them.
- *
- * D13 is deliberately unused: it is the user LED and, on several Nucleos, also
- * SCK. */
+/* Nucleo-64 in Arduino header numbering, so this holds for an F103, F411 or
+ * L476 alike. D13 is left alone: user LED, and SCK on several Nucleos. */
 
 #define RCLIGHTS_BOARD_NAME "STM32"
 
@@ -212,8 +169,7 @@ struct RcLightsPins {
 
 #else
 
-/* Unknown core: the Arduino-standard numbering, which is right often enough to
- * compile and be a sensible starting point. Check it against your board's pin
+/* Unknown core: Arduino-standard numbering. Check it against your board's pin
  * table before wiring anything. */
 
 #define RCLIGHTS_BOARD_NAME "generic"
@@ -248,26 +204,13 @@ struct RcLightsPins {
 
 #endif
 
-/**
- * @brief This board's pin map, in ::RcLightsPins field order.
- *
- * Pass it to `RcLights::begin()`. Any pin that a build flag or a `#define` in
- * the sketch has already set keeps that value.
- */
+/** @brief This board's pin map, in ::RcLightsPins field order. */
 #define RCLIGHTS_PINS_DEFAULT {RCLIGHTS_PIN_STEERING, RCLIGHTS_PIN_THROTTLE, RCLIGHTS_PIN_CH3, RCLIGHTS_PIN_FRONT, RCLIGHTS_PIN_REAR, RCLIGHTS_PIN_REVERSE, RCLIGHTS_PIN_SIGNAL_LEFT, RCLIGHTS_PIN_SIGNAL_RIGHT, RCLIGHTS_PIN_AUX}
 
 /*
- * PWM back end.
- *
- * ESP32 before Arduino core 3.0 has no analogWrite() and drives LEDs through
- * the LEDC peripheral, one channel per output. From core 3.0 analogWrite()
- * exists and maps onto LEDC itself, so the special case is only for the older
- * core — which is still what a great many installed toolchains have.
- *
- * Note that CI installs the current esp32 core, so it compiles the
- * analogWrite() branch and not this one. The LEDC branch is the least-covered
- * code in the library: nothing but a 2.x toolchain will tell you it still
- * builds.
+ * ESP32 before Arduino core 3.0 has no analogWrite() and needs LEDC directly.
+ * CI installs the current core, so that branch is the least-covered code here:
+ * only a 2.x toolchain will tell you it still builds.
  */
 #if defined(ARDUINO_ARCH_ESP32)
 #if !defined(ESP_ARDUINO_VERSION_MAJOR) || ESP_ARDUINO_VERSION_MAJOR < 3
@@ -283,9 +226,8 @@ struct RcLightsPins {
 /**
  * @brief Default PWM carrier frequency, in Hz, where the board can set one.
  *
- * Above the flicker fusion threshold by a wide margin, so a camera pointed at
- * the car does not see banding, and low enough that a MOSFET driving a string
- * of LEDs still switches cleanly.
+ * High enough that a camera sees no banding, low enough that a MOSFET still
+ * switches cleanly.
  */
 #ifndef RCLIGHTS_PWM_HZ
 #define RCLIGHTS_PWM_HZ 1000u
@@ -294,9 +236,8 @@ struct RcLightsPins {
 /**
  * @brief Attribute for an interrupt handler that must not live in flash.
  *
- * On ESP32 an ISR that runs while the flash cache is disabled — during an SPI
- * flash write, for instance — must be in IRAM or the chip panics. Everywhere
- * else this expands to nothing.
+ * On ESP32 an ISR running while the flash cache is disabled must be in IRAM or
+ * the chip panics. Elsewhere this expands to nothing.
  */
 #if defined(ARDUINO_ARCH_ESP32)
 #define RCLIGHTS_ISR_ATTR IRAM_ATTR

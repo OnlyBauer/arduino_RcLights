@@ -10,9 +10,8 @@
 /*
  * WIRING
  *
- * Connect the receiver's ground to the board's ground -- without it the pulses
- * are measured against nothing. Each LED goes to its pin through a resistor;
- * anything brighter than a single LED needs a transistor on the pin.
+ * Connect the receiver's ground to the board's ground. Each LED goes to its pin
+ * through a resistor; anything brighter than one LED needs a transistor.
  *
  *                      Nano    Nucleo   ESP32
  *   steering  (ch1)     D4       D2      GPIO 34
@@ -25,13 +24,12 @@
  *   signal right       D10      D10      GPIO 25
  *   aux                D11      D11      GPIO 33
  *
- * To move one, define its pin before the include above, for example
- * `#define RCLIGHTS_PIN_FRONT 6`, or pass -DRCLIGHTS_PIN_FRONT=6 from the
- * build. Use RCLIGHTS_PIN_NONE for anything you have not wired.
+ * To move one, #define its pin above the include (or pass
+ * -DRCLIGHTS_PIN_FRONT=6 from the build). RCLIGHTS_PIN_NONE for anything you
+ * have not wired.
  *
- * The centre of each stick is measured automatically in the first fifth of a
- * second after the receiver comes up, so leave the sticks alone when you
- * switch on.
+ * The stick centres are measured in the first fifth of a second after the
+ * receiver comes up, so leave the sticks alone when you switch on.
  */
 
 /**
@@ -65,13 +63,11 @@ void setup()
 
     /* ================= OPTIONAL =================
      *
-     * Every setting the controller has, with the value it already uses. Delete
-     * the whole block and the car drives exactly the same; keep the two or
-     * three lines you want to change and delete the rest.
+     * Every setting, with the value it already uses. Delete the block and the
+     * car drives the same; keep the lines you want to change.
      */
 
-    /* Brightness, 0 to 255. A scale model seen from half a metre wants far
-     * less than you would think; what matters is the step from park to brake. */
+    /* Brightness, 0 to 255. What matters is the step from park to brake. */
     lights.level_front_park = 40;   /* front LED standing still */
     lights.level_front_drive = 255; /* front LED while driving */
     lights.level_rear_park = 30;    /* rear LED not braking */
@@ -82,9 +78,8 @@ void setup()
     lights.park_lights_on = true;   /* park and tail light on at all */
     lights.fade_step = 40;          /* fade speed; 0 switches instantly */
 
-    /* Turn signals. The indicators only start once the steering has been
-     * still for center_hold_ms, which is what tells a corner from a
-     * correction. */
+    /* Turn signals. They only start once the steering has been still for
+     * center_hold_ms, which tells a corner from a correction. */
     lights.steer_trigger = 350;     /* how far to steer before it indicates */
     lights.steer_release = 200;     /* how far back before it stops */
     lights.steer_center_band = 120; /* steering this small counts as straight */
@@ -93,26 +88,24 @@ void setup()
     lights.blink_period_ms = 700;   /* one blink, on plus off */
     lights.blink_duty = 50;         /* percent of that spent lit */
 
-    /* Throttle. coast_ms stands in for the speed sensor the car has not got:
-     * while it is running a backwards stick is braking, and after it a
-     * backwards stick is reverse. */
+    /* Throttle. coast_ms stands in for the speed sensor there is not: while it
+     * runs a backwards stick brakes, after it the same stick reverses. */
     lights.coast_ms = 1500;            /* how long the car keeps rolling */
     lights.brake_threshold = 200;      /* backwards stick this big is braking */
     lights.throttle_center_band = 100; /* throttle this small counts as neutral */
     lights.reverse_arm_ms = 250;       /* hold back this long to select reverse */
     lights.brake_extend_ms = 400;      /* brake light holds on after release */
 
-    /* Channel 3. What the switch does in its low, middle and high position;
-     * the middle one is unused on a two-position switch. */
+    /* Channel 3: low, middle and high position. The middle one is unused on a
+     * two-position switch. */
     lights.aux_action[0] = ACTION_NOTHING;
     lights.aux_action[1] = ACTION_AUX;
     lights.aux_action[2] = ACTION_HAZARDS;
     lights.aux_low = -300; /* below this is the low position */
     lights.aux_high = 300; /* above this is the high position */
 
-    /* The receiver. The centres look after themselves, so only the endpoints
-     * are worth setting -- run the RcLightsCalibrate example to measure them.
-     * Set invert if a channel works the wrong way round. */
+    /* The receiver. The centres look after themselves; run RcLightsCalibrate
+     * to measure the endpoints. invert if a channel works the wrong way. */
     lights.cal[RCL_CH_STEER].min_us = 1000;
     lights.cal[RCL_CH_STEER].max_us = 2000;
     lights.cal[RCL_CH_STEER].invert = false;

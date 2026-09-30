@@ -33,10 +33,6 @@ What it does, out of the box:
 
 Runs on an Arduino Nano, an ST Nucleo and an ESP32 DevKit from the same source.
 
-> **Status: 0.1.0, not verified on a car.** It compiles for all three targets
-> and passes 289 host checks. Nobody has driven it yet. See
-> [CHANGELOG.md](CHANGELOG.md) for what that specifically means.
-
 ## Installing
 
 Not in the Arduino Library Manager yet — see

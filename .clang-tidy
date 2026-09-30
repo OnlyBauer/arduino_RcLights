@@ -1,20 +1,12 @@
 # Static analysis for RcLights, enforced by tools/ci.sh lint and by the lint
 # stage in .gitlab-ci.yml.
 #
-# The check list is taken over from arduino_crsf; the suppressions explicitly
-# are not. This repository has no vendored third-party core and no wire
-# protocol, so most of the reasons something had to be switched off there do not
-# apply. What is listed here is justified; what was listed there and is missing
-# here was never true of this repository.
+# The check list comes from arduino_crsf; the suppressions do not, and each one
+# below is justified.
 #
-# The purpose is regression protection, not bug hunting: at the state it was
-# introduced, the enabled checks report nothing across rclights_core.c and
-# RcLights.cpp. The job is therefore blocking from the outset rather than
-# allow_failure -- it is meant to go red as soon as the next patch adds
-# something.
-#
-# WarningsAsErrors covers everything the checks can produce. A clang-tidy run
-# without it exits 0 even on warnings and would be silently worthless in CI.
+# The purpose is regression protection: the enabled checks currently report
+# nothing, so the job is blocking rather than allow_failure. WarningsAsErrors
+# covers everything, because a clang-tidy run without it exits 0 on warnings.
 
 Checks: >
   -*,
@@ -43,92 +35,63 @@ Checks: >
 
 WarningsAsErrors: '*'
 
-# Note that tools/ci.sh passes this same value on the command line as
-# --header-filter, because at least one clang-tidy build loads it from here and
-# then does not apply it, which made every finding in these headers invisible
-# locally while it fired in CI. The value lives here so that editors and IDE
-# integrations use it too; ci.sh reads it out of this file rather than keeping a
-# second copy that could drift.
+# tools/ci.sh passes this same value as --header-filter, because at least one
+# clang-tidy build loads it from here and then does not apply it. It lives here
+# so editors use it too, and ci.sh reads it from this file rather than keeping a
+# second copy.
 HeaderFilterRegex: 'rclights_(core|config|board)\.h$|RcLights\.h$'
 
-# The reason for each individual suppression above -- without this list, nobody
-# would know next time whether a check is missing for a good reason or out of
-# convenience:
+# Why each suppression above, so that nobody has to guess next time whether a
+# check is missing for a reason or out of convenience:
 #
 # bugprone-easily-swappable-parameters
-#   Reports every function with two adjacent parameters of the same type. The
-#   calibration consists of three microsecond values in a row (min, center, max)
-#   and the brightness levels of several uint8_t; in that order both are what
-#   the user sees in the data sheet and on the transmitter, and a structure per
-#   pair of arguments would make the API worse rather than safer. The
-#   calibration values are checked by rcl_config_validate() instead, which
-#   actually catches a swapped pair rather than merely making one harder to
-#   write.
+#   Fires on any two adjacent parameters of one type. The calibration is three
+#   microsecond values in the order the user reads them off a transmitter; a
+#   structure per argument pair would make the API worse. rcl_config_validate()
+#   catches a swapped pair, which this check only makes harder to write.
 #
 # bugprone-narrowing-conversions
-#   The core logic computes in int32_t and emits brightness as uint8_t. Every
-#   one of those conversions sits behind a clamp to 0..255 that this check
-#   cannot see.
+#   The core computes in int32_t and emits uint8_t. Every such conversion sits
+#   behind a clamp to 0..255 that the check cannot see.
 #
 # cert-dcl37-c / cert-dcl51-cpp
-#   Reserved identifiers. Fires on the include guards (RCLIGHTS_..._H), which
-#   are not reserved.
+#   Reserved identifiers. Fires on the include guards, which are not reserved.
 #
 # cert-err33-c
-#   Requires checking the return value of printf and friends. In the test suites
-#   that is pointless.
+#   Wants the return value of printf checked. Pointless in the test suites.
 #
 # cert-err58-cpp
-#   Requires that the constructor of an object with static storage duration
-#   cannot throw. Here that means the one static RcLights instance every sketch
-#   creates, and the mocks in tests/. No repository of this project uses
-#   exceptions; the target is microcontrollers.
+#   Wants a static-storage constructor that cannot throw: the one RcLights
+#   instance a sketch creates, and the test mocks. Nothing here uses exceptions.
 #
 # clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling
-#   Requires memset_s from C11 Annex K for the two memset calls in
-#   rclights_core.c. Annex K is optional, and none of the C libraries in
-#   question here -- avr-libc, newlib, glibc -- provides it. Both calls zero a
-#   structure of known size via sizeof(*ptr); there is no length that could be
-#   wrong.
+#   Wants memset_s from C11 Annex K, which is optional and provided by none of
+#   avr-libc, newlib or glibc. Both calls zero a structure via sizeof(*ptr), so
+#   there is no length that could be wrong.
 #
 # misc-include-cleaner
-#   Requires every name used to be included directly. Applied to Arduino.h,
-#   which is itself an umbrella over half a dozen core headers, that produces
-#   suggestions which do not compile on a different core.
+#   Wants every name included directly. Against Arduino.h, itself an umbrella
+#   over a dozen headers, that yields suggestions which fail on another core.
 #
 # misc-const-correctness
-#   Reports the scalar variables the CHECK_EQ_* macros in test_util.h create.
-#   test_util.h is taken over unchanged from c_crsf and is not going to be
-#   adjusted for a C++ quirk that exists in no other repository of this project.
+#   Fires on variables the CHECK_EQ_* macros create. test_util.h is unchanged
+#   from c_crsf and is not adjusted for a C++ quirk no other repository has.
 #
 # misc-non-private-member-variables-in-classes
-#   Reports RcLights::outputs for being public. That is the interface, not an
-#   oversight: a sketch writes `lights.outputs = ...` exactly as it writes
-#   `lights.esc_mode = ...`. The only difference is that esc_mode is inherited
-#   from rcl_config_t -- a structure whose fields are all public, which this
-#   check therefore ignores -- and outputs is not, because LED polarity
-#   describes the wiring rather than the controller. So the check singles out
-#   exactly one field of a class whose configuration surface is entirely public
-#   anyway.
+#   Fires on RcLights::outputs for being public, which is the interface: a
+#   sketch writes it exactly as it writes lights.esc_mode. The only difference
+#   is that esc_mode is inherited from rcl_config_t, an all-public struct the
+#   check ignores, and outputs is not.
 #
 # misc-use-anonymous-namespace
-#   Requires anonymous namespaces instead of internal linkage via `static`.
-#   `static` for file-local functions is the idiom in all four repositories,
-#   three of which are pure C, where anonymous namespaces do not exist.
+#   Wants anonymous namespaces instead of `static`. `static` is the idiom in all
+#   four repositories, three of which are C, where they do not exist.
 #
 # performance-enum-size
-#   Suggests shrinking the base type of each of the eight enumerations to
-#   uint8_t. The suggestion cannot be acted on here: rclights_core.h is a C11
-#   header, and the syntax `enum x : uint8_t` has only existed in C since C23.
-#   Seven of the eight enumerations are in that file. Converting the eighth
-#   (RcLightsOutputs, C++) on its own would not satisfy the check and would make
-#   the two halves of the library inconsistent.
+#   Wants uint8_t as the base type of the eight enumerations. Seven are in a C11
+#   header, and `enum x : uint8_t` has only existed in C since C23; converting
+#   the eighth alone would not satisfy the check. The gain is nil on the
+#   tightest target anyway, since avr-gcc defaults to -fshort-enums.
 #
-#   The gain would be small in any case, and on the tightest target none at all:
-#   avr-gcc compiles with -fshort-enums by default, so every one of these
-#   enumerations is already a single byte there. On ESP32 and STM32 they are
-#   four bytes, and there memory is not the constraint.
-#
-#   Worth knowing if this ever comes up again: the size of the enumerations
-#   feeds into sizeof(rcl_config_t), and tests/test_example_defaults.cpp checks
-#   that against a fixed value.
+#   If this comes up again: enum size feeds into sizeof(rcl_config_t), which
+#   tests/test_example_defaults.cpp checks against a fixed value.

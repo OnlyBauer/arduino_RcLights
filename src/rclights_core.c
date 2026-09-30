@@ -3,13 +3,8 @@
  * @file rclights_core.c
  * @brief Implementation of the board-independent light controller.
  *
- * Integer arithmetic throughout, no allocation, no I/O and no dependency beyond
- * `<string.h>` for memset. The heaviest operation in the whole file is a 32-bit
- * divide in rcl_normalize(), which runs once per channel per update; that is
- * within reach of an ATmega328P at 16 MHz with room to spare.
- *
- * The order of the steps in rcl_update() is load-bearing and is called out at
- * each one.
+ * Integer arithmetic, no allocation, no I/O. The heaviest operation is one
+ * 32-bit divide per channel per update, in rcl_normalize().
  */
 
 #include "rclights_core.h"
@@ -59,14 +54,12 @@ void rcl_config_default(rcl_config_t *cfg)
         cfg->cal[i].invert = false;
     }
 
-    /* Wider than the nominal 1000..2000 because receivers overshoot at the
-     * endpoints, but far enough inside the frame period that a missed edge
-     * cannot be mistaken for a pulse. */
+    /* Wider than the nominal 1000..2000 because receivers overshoot, but still
+     * far short of a frame period. */
     cfg->pulse_min_us = 700;
     cfg->pulse_max_us = 2300;
-    /* About eleven frames at 50 Hz. Long enough that a few dropped frames on a
-     * marginal link do not flash the hazards, short enough to react before the
-     * car has gone far. */
+    /* About eleven frames at 50 Hz: a few dropped frames do not flash the
+     * hazards, but a real loss is caught quickly. */
     cfg->signal_timeout_ms = 500;
     cfg->failsafe_hazard = true;
     /* Ten frames at 50 Hz: long enough to average out the jitter and to notice
@@ -106,8 +99,7 @@ void rcl_config_default(rcl_config_t *cfg)
     cfg->level_turn = 255;
     cfg->level_aux = 255;
     cfg->park_lights_on = true;
-    /* 40 steps per 10 ms is the full range in about 64 ms: visibly a lamp
-     * warming up rather than a delay. */
+    /* Full range in about 64 ms: a lamp warming up, not a delay. */
     cfg->fade_step = 40;
 }
 
@@ -231,16 +223,13 @@ bool rcl_init(rcl_state_t *st, const rcl_config_t *cfg, uint32_t now_ms)
     st->cfg = use;
     st->last_ms = now_ms;
     st->started = true;
-    /* No channel has been seen yet, so the controller starts in failsafe and
-     * stays there until the receiver produces pulses. A light controller that
-     * powered up assuming a good link would show park lights on a car whose
-     * transmitter is still off. */
+    /* Starts in failsafe until the receiver produces pulses, so a car whose
+     * transmitter is off does not sit there with its park lights on. */
     st->failsafe = true;
     for (int i = 0; i < RCL_CH_COUNT; i++)
         st->last_seen_ms[i] = now_ms;
 
-    /* With the window set to zero the configured centres are used as given and
-     * the sticks are live from the first pulse. */
+    /* Zero window: configured centres, sticks live from the first pulse. */
     for (int i = 0; i < 2; i++)
         st->center_done[i] = use.auto_center_ms == 0u;
 
@@ -248,11 +237,10 @@ bool rcl_init(rcl_state_t *st, const rcl_config_t *cfg, uint32_t now_ms)
 }
 
 /**
- * @brief Fold one reading into a channel's centring measurement, and finish it
+ * @brief Fold one reading into a channel's centring measurement, finishing it
  *        once the window has passed.
  *
- * Only the steering and throttle are centred. A switch has no rest position:
- * whichever way it happens to be flicked at power-up would become its centre.
+ * Steering and throttle only: a switch has no rest position.
  *
  * @param st State.
  * @param ch Channel, ::RCL_CH_STEER or ::RCL_CH_THROTTLE.
@@ -274,10 +262,8 @@ static void step_center(rcl_state_t *st, int ch, uint16_t pulse_us, uint32_t now
         st->center_hi[ch] = pulse_us;
 
     st->center_sum[ch] += pulse_us;
-    /* The count cannot realistically overflow -- the window is capped at five
-     * seconds and a receiver produces fifty frames a second -- but a caller
-     * that feeds this in a tight loop would get there, and a wrapped count
-     * divides by the wrong number. */
+    /* A caller feeding this in a tight loop could overflow the count, and a
+     * wrapped count divides by the wrong number. */
     if (st->center_count[ch] < 0xFFFFu)
         st->center_count[ch]++;
 
@@ -287,11 +273,9 @@ static void step_center(rcl_state_t *st, int ch, uint16_t pulse_us, uint32_t now
     uint16_t spread = (uint16_t)(st->center_hi[ch] - st->center_lo[ch]);
     uint16_t mean = (uint16_t)(st->center_sum[ch] / st->center_count[ch]);
 
-    /* Three guards, and they catch different things. `steady` rejects a stick
-     * that moved while it was being measured. `near` rejects one that was held
-     * still in the wrong place, which `steady` cannot see. `inside` is the
-     * backstop that keeps rcl_config_validate()'s invariant -- the centre
-     * strictly inside the endpoints -- true whatever the readings were. */
+    /* Three guards for three different mistakes: `steady` rejects a stick that
+     * moved while being measured, `near` one held still in the wrong place,
+     * and `inside` keeps the centre within its own endpoints regardless. */
     int32_t shift = (int32_t)mean - (int32_t)cal->center_us;
     if (shift < 0)
         shift = -shift;
@@ -331,15 +315,13 @@ static void step_inputs(rcl_state_t *st, const rcl_input_t *in, uint32_t now_ms)
             st->norm[i] = 0;
         }
 
-        /* Until a channel has been centred, report it as centred. Acting on a
-         * stick whose rest point is still being measured is how a car flashes
-         * an indicator or shows reverse in the first fraction of a second
-         * after the receiver binds. */
+        /* Until centred, report centred: otherwise the car flashes an
+         * indicator in the first moments after the receiver binds. */
         if (i < 2 && !st->center_done[i])
             st->norm[i] = 0;
     }
 
-    /* Channel 3 only counts when it is configured: a two-channel receiver must
+    /* Channel 3 counts only when configured, so a two-channel receiver does
      * not sit in permanent failsafe. */
     st->failsafe = !st->chan_valid[RCL_CH_STEER] || !st->chan_valid[RCL_CH_THROTTLE] ||
                    (c->aux_mode != RCL_AUX_MODE_OFF && !st->chan_valid[RCL_CH_AUX]);
@@ -402,7 +384,7 @@ static void step_drive(rcl_state_t *st, uint32_t dt)
         st->drive = RCL_DRIVE_FORWARD;
         st->coast_left = c->coast_ms;
         st->back_held_ms = 0;
-        /* Reverse has to be asked for again after driving forwards. */
+        /* Reverse must be asked for again after driving forwards. */
         st->reverse_armed = false;
     } else if (thr <= -c->brake_threshold) {
         st->back_held_ms += dt;
@@ -412,9 +394,9 @@ static void step_drive(rcl_state_t *st, uint32_t dt)
             !rolling && (c->esc_mode == RCL_ESC_DIRECT_REVERSE || st->reverse_armed);
 
         if (may_reverse) {
-            /* Idle, not brake, while the debounce runs: showing the brake light
-             * for a quarter second every time reverse is selected from a
-             * standstill would be a flicker, not information. */
+            /* Idle, not brake, while the debounce runs: a quarter second of
+             * brake light on every reverse selection is flicker, not
+             * information. */
             st->drive = st->back_held_ms >= c->reverse_arm_ms ? RCL_DRIVE_REVERSE
                                                               : RCL_DRIVE_IDLE;
         } else {
@@ -458,7 +440,7 @@ static void step_aux(rcl_state_t *st)
         st->aux_pos = 0;
     else if (c->aux_mode == RCL_AUX_MODE_3POS)
         st->aux_pos = 1;
-    /* Two-position switch, reading between the thresholds: keep the last
+    /* Between the thresholds on a two-position switch: keep the last
      * position. The gap is hysteresis, not a third state. */
 
     switch (c->aux_action[st->aux_pos]) {
@@ -500,9 +482,9 @@ static void step_turn(rcl_state_t *st, uint32_t dt)
     rcl_turn_t side = s > 0 ? RCL_TURN_RIGHT : RCL_TURN_LEFT;
 
     if (st->turn == RCL_TURN_NONE) {
-        /* Armed means: the steering sat still long enough that this deflection
-         * is a deliberate turn and not a line correction. Arming is consumed
-         * here, so the next signal needs the wheel centred again. */
+        /* Armed means the wheel sat still long enough for this to be a
+         * deliberate turn. Consumed here, so the next one needs centring
+         * again. */
         if (st->turn_armed && mag >= c->steer_trigger) {
             st->turn = side;
             st->turn_armed = false;
@@ -516,8 +498,8 @@ static void step_turn(rcl_state_t *st, uint32_t dt)
     st->turn_ms += dt;
 
     if (mag >= c->steer_trigger && side != st->turn) {
-        /* Steering straight from one lock to the other: switch sides at once
-         * rather than finishing the old signal first. */
+        /* Lock to lock: switch sides at once rather than finishing the old
+         * signal. */
         st->turn = side;
         st->turn_ms = 0;
         st->turn_ending = false;
@@ -542,8 +524,7 @@ static void step_targets(rcl_state_t *st)
     if (!st->lights_off && (st->drive == RCL_DRIVE_FORWARD || st->drive == RCL_DRIVE_REVERSE))
         front = c->level_front_drive;
 
-    /* The brake light is not switched off by the light switch. Neither is it on
-     * a real car, and for the same reason. */
+    /* The light switch does not kill the brake light, as on a real car. */
     uint8_t rear = park ? c->level_rear_park : 0;
     if (st->drive == RCL_DRIVE_BRAKE || st->brake_left > 0u)
         rear = c->level_rear_brake;
@@ -563,8 +544,7 @@ static void step_targets(rcl_state_t *st)
 /**
  * @brief Move the outputs towards their targets.
  *
- * Only the front and rear LED are slewed; everything else is a lamp that is
- * either on or off, and a fading indicator would read as a fault.
+ * Front and rear only; a fading indicator would read as a fault.
  *
  * @param st State.
  * @param dt Elapsed time, ms.
@@ -582,9 +562,8 @@ static void step_fade(rcl_state_t *st, uint32_t dt)
 
         uint32_t step = ((uint32_t)c->fade_step * dt) / 10u;
         if (step == 0u) {
-            /* Called again within the same few milliseconds; nothing to do
-             * yet. Rounding up here instead would make the fade time depend on
-             * how often the sketch happens to call loop(). */
+            /* Nothing to do yet. Rounding up instead would tie the fade time
+             * to how often the sketch calls loop(). */
             continue;
         }
         if (step > RCL_LEVEL_MAX)
@@ -639,10 +618,8 @@ void rcl_update(rcl_state_t *st, const rcl_input_t *in, uint32_t now_ms)
     if (!st || !st->started)
         return;
 
-    /* Unsigned difference, so a clock that has wrapped past 2^32 needs no
-     * special case. The clamp covers the other direction: a sketch that was
-     * blocked for a second should not fast-forward the blink phase by a
-     * second's worth of cycles. */
+    /* Unsigned, so a wrapped clock needs no special case. The clamp stops a
+     * sketch that blocked for a second fast-forwarding the blink phase. */
     uint32_t dt = now_ms - st->last_ms;
     if (dt > RCL_DT_MAX_MS)
         dt = RCL_DT_MAX_MS;
@@ -656,9 +633,8 @@ void rcl_update(rcl_state_t *st, const rcl_input_t *in, uint32_t now_ms)
         return;
     }
 
-    /* Order matters: the aux switch can raise the hazards, which step_blink()
-     * has to see in the same update, and step_turn() has to run before it too
-     * so that a signal starting this update begins lit. */
+    /* Order matters: step_blink() must see hazards raised by step_aux() and a
+     * signal started by step_turn() in the same update. */
     step_drive(st, dt);
     step_aux(st);
     step_turn(st, dt);

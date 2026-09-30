@@ -3,24 +3,13 @@
  * @file Arduino.h
  * @brief Enough of the Arduino runtime to compile and drive RcLights on a host.
  *
- * **The code under test is the real, shipping `src/RcLights.cpp`** — nothing is
- * reimplemented, and no `#ifdef` was added to it to accommodate this.
+ * The code under test is the real src/RcLights.cpp; nothing in it was changed
+ * to accommodate this. The clock, the pin levels and the interrupt handlers are
+ * all things a test drives directly, and analogWrite() records what was written.
  *
- * What carries real behaviour:
- *
- * | Stub | Behaviour |
- * | --- | --- |
- * | `micros()` / `millis()` | one clock the test moves by hand, including across the 32-bit wrap |
- * | `attachInterrupt()` | records the handler; mock_pulse() calls it on both edges, exactly as a receiver would |
- * | `digitalRead()` | returns the level mock_pulse() has set, so the capture sees a real edge sequence |
- * | `analogWrite()` | records the last value per pin, which is what the tests assert on |
- *
- * @par What this deliberately cannot test
- * There is no board. Nothing here says anything about interrupt latency, about
- * whether a given pin really has a timer channel behind it, or about the AVR
- * pin-change path — that one is compiled out on a host, and only a Nano can
- * show whether it works. This exercises the capture, the plumbing into the core
- * and the output writing, and nothing else.
+ * There is no board here: nothing is said about interrupt latency, about
+ * whether a pin really has a timer, or about the AVR pin-change path, which is
+ * compiled out on a host.
  */
 
 #ifndef ARDUINO_MOCK_H
@@ -103,9 +92,7 @@ void mock_advance_ms(uint32_t ms);
 /**
  * @brief Drive one complete servo pulse on a pin, firing both edges.
  *
- * Advances the clock by @p width_us, which is what a real pulse does, so a test
- * that sends a frame on three channels moves time by three pulse widths. That
- * is a few milliseconds and does not disturb anything the core measures.
+ * Advances the clock by @p width_us, as a real pulse does.
  *
  * @param pin Pin the receiver channel is wired to.
  * @param width_us Pulse width, in microseconds.

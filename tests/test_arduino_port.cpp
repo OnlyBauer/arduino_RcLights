@@ -3,17 +3,11 @@
  * @file test_arduino_port.cpp
  * @brief Host tests for the Arduino wrapper in src/RcLights.cpp.
  *
- * The code under test is the real, shipping wrapper. What is replaced is
- * `Arduino.h`, by `arduino_stubs/` — so the clock, the pins and the interrupts
- * are things a test controls. Pulses are delivered the way a receiver delivers
- * them, as a rising edge, a wait and a falling edge, each one calling the
- * handler the wrapper installed.
+ * The real wrapper, with `Arduino.h` replaced by `arduino_stubs/`, so the
+ * clock, the pins and the interrupts are things a test controls. Pulses arrive
+ * as a rising edge, a wait and a falling edge, as from a receiver.
  *
- * The core's behaviour is not re-tested here; `test_core.c` does that without a
- * board in the way. What this checks is the plumbing: that a pulse on a pin
- * arrives at the core with the width it had, that the core's output ends up on
- * the right pin, that inversion and the single-instance rule hold, and that
- * end() really lets go.
+ * The core's behaviour is tested in test_core.c; this checks the plumbing.
  */
 
 #include <Arduino.h>
@@ -60,7 +54,7 @@ void feed(RcLights &lights, uint32_t steer_us, uint32_t thr_us, uint32_t aux_us,
 {
     uint32_t end = millis() + ms;
     while (millis() < end) {
-        /* One frame: three pulses back to back, as a receiver puts them out. */
+        /* One frame: three pulses back to back. */
         mock_pulse(PIN_CH1, steer_us);
         mock_pulse(PIN_CH2, thr_us);
         mock_pulse(PIN_CH3, aux_us);
@@ -152,8 +146,7 @@ static void test_writes_are_not_repeated(void)
     feed(lights, 1500, 1500, 1000, 400);
     uint32_t after = mock_writes(PIN_FRONT);
 
-    /* Hundreds of loop() calls with nothing changing must not produce hundreds
-     * of analogWrite()s: on AVR each one reconfigures a timer register. */
+    /* On AVR each analogWrite() reconfigures a timer register. */
     CHECK_EQ_INT(after, before, "a steady output is written once, not every loop");
 
     lights.end();
@@ -191,8 +184,7 @@ static void test_object_settings(void)
     CHECK_EQ_INT(lights.config().esc_mode, RCL_ESC_DIRECT_REVERSE, "esc_mode applied");
     CHECK_EQ_INT(lights.config().aux_mode, RCL_AUX_MODE_2POS, "aux_mode applied");
 
-    /* And they behave: a direct-reverse ESC reverses without passing through
-     * neutral, which the default mode would not do. */
+    /* And they behave: a direct-reverse ESC needs no neutral. */
     feed(lights, 1500, 1500, 1000, 300);
     feed(lights, 1500, 1800, 1000, 300);
     feed(lights, 1500, 1200, 1000, 2500);
@@ -212,8 +204,7 @@ static void test_full_config_wins(void)
     cfg.esc_mode = RCL_ESC_DIRECT_REVERSE;
     cfg.aux_mode = RCL_AUX_MODE_OFF;
 
-    /* Set the fields to the opposite of the configuration, to show which one
-     * this overload listens to. */
+    /* Opposite of the configuration, to show which one this overload uses. */
     lights.esc_mode = RCL_ESC_BRAKE_THEN_REVERSE;
     lights.aux_mode = RCL_AUX_MODE_3POS;
 
@@ -233,9 +224,7 @@ static void test_settings_are_fields(void)
     mock_reset();
     RcLights lights;
 
-    /* Not just the three a car normally needs: these are ordinary
-     * rcl_config_t fields, reached through the inheritance rather than through
-     * a list the wrapper has to keep up to date. */
+    /* Ordinary rcl_config_t fields, reached through the inheritance. */
     lights.level_front_park = 100;
     lights.park_lights_on = true;
     lights.fade_step = 0;
@@ -247,8 +236,7 @@ static void test_settings_are_fields(void)
     feed(lights, 1500, 1500, 1000, 300);
     CHECK_EQ_INT(mock_analog(PIN_FRONT), 100, "and it is what the pin shows");
 
-    /* The inverted channel proves it is the whole structure and not a handful
-     * of copied scalars: steering right now reads as left. */
+    /* The inverted channel proves the whole structure came through. */
     feed(lights, 1900, 1500, 1000, 100);
     CHECK_EQ_INT(lights.channel(RCL_CH_STEER), -800, "the calibration came through too");
 
@@ -291,9 +279,8 @@ static void test_output_polarity(void)
     lights.outputs = RCLIGHTS_OUTPUTS_ACTIVE_LOW;
     CHECK(lights.begin(kPins), "begin");
 
-    /* The first thing written to every pin must already be the dark level. An
-     * active-low string that saw a 0 here would flash at full brightness every
-     * time the car was switched on. */
+    /* The first write must already be the dark level, or an active-low string
+     * flashes at full brightness on every power-up. */
     CHECK_EQ_INT(mock_analog(PIN_FRONT), 255, "front pin dark from the first write");
     CHECK_EQ_INT(mock_analog(PIN_REAR), 255, "rear pin dark from the first write");
     CHECK_EQ_INT(mock_writes(PIN_FRONT), 1u, "and it was written exactly once");
@@ -311,10 +298,8 @@ static void test_output_polarity(void)
 /**
  * @brief The short constant spellings name the same values as the long ones.
  *
- * They exist because the Arduino style guide asks for shorter constants, and
- * they are what the examples type. An alias pointing at the wrong value would
- * be a bug a reader could not see -- both spellings compile, and both look
- * plausible -- so each one is checked here against what it aliases.
+ * An alias pointing at the wrong value is a bug no reader could see: both
+ * spellings compile and both look plausible.
  */
 static void test_short_constants(void)
 {
@@ -334,7 +319,7 @@ static void test_short_constants(void)
     CHECK_EQ_INT(ACTION_AUX, RCL_AUX_ACTION_AUX, "ACTION_AUX");
     CHECK_EQ_INT(ACTION_LIGHTS_OFF, RCL_AUX_ACTION_LIGHTS_OFF, "ACTION_LIGHTS_OFF");
 
-    /* And they are usable where the long ones are, which is the whole point. */
+    /* And they are usable wherever the long ones are. */
     mock_reset();
     RcLights lights;
     lights.esc_mode = ESC_DIRECT_REVERSE;
@@ -353,7 +338,7 @@ static void test_centering_accessor(void)
     RcLights lights;
     CHECK(lights.begin(kPins), "begin");
 
-    /* It exists so that a sketch never has to write rcl_centering(&state). */
+    /* It exists so no sketch has to write rcl_centering(&state). */
     CHECK(lights.centering(), "centring is pending before any pulse arrives");
 
     feed(lights, 1500, 1500, 1000, 400);

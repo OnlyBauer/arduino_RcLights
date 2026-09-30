@@ -3,10 +3,9 @@
  * @file RcLights.cpp
  * @brief Pulse capture, PWM output and the board-specific parts of both.
  *
- * Three things happen here and nothing else: edges are timestamped into
- * ::RcLights::Capture from interrupt context, loop() moves those measurements
+ * Edges are timestamped from interrupt context, loop() moves the measurements
  * into the core, and the core's six brightness values are written to pins. No
- * decision about the lights is taken in this file.
+ * decision about the lights is taken here.
  */
 
 #include "RcLights.h"
@@ -31,9 +30,7 @@ RcLights::RcLights()
       m_cap(), m_pulse(), m_invert(0), m_written(), m_pwmHz(RCLIGHTS_PWM_HZ),
       m_running(false)
 {
-    /* The inherited settings start where rcl_config_default() puts them, so a
-     * sketch that writes none of them gets the same car as one that writes them
-     * all to their defaults. */
+    /* The inherited settings start where rcl_config_default() puts them. */
     rcl_config_default(this);
 
     const RcLightsPins defaults = RCLIGHTS_PINS_DEFAULT;
@@ -67,10 +64,8 @@ bool RcLights::begin(const RcLightsPins &pins, const rcl_config_t &cfg)
     if (s_active != nullptr && s_active != this)
         return false;
 
-    /* A configured channel 3 with no pin to read it on would leave the core
-     * waiting for a channel that can never arrive, and the whole controller
-     * would sit in failsafe with the hazards flashing. Refusing here points at
-     * the actual mistake. */
+    /* A configured channel 3 with no pin would leave the controller in
+     * permanent failsafe. Refusing here points at the actual mistake. */
     if (cfg.aux_mode != RCL_AUX_MODE_OFF && pins.ch3 == RCLIGHTS_PIN_NONE)
         return false;
 
@@ -79,13 +74,11 @@ bool RcLights::begin(const RcLightsPins &pins, const rcl_config_t &cfg)
 
     m_pins = pins;
 
-    /* Keep the object's own fields honest: they must report what was applied,
-     * not what they happened to hold when a configuration arrived from
-     * elsewhere. */
+    /* The fields must report what was applied, not what they held. */
     *static_cast<rcl_config_t *>(this) = cfg;
 
-    /* Before the pins are first driven, below. An active-low string would
-     * otherwise sit at full brightness for the length of this function. */
+    /* Before the pins are first driven: an active-low string would otherwise
+     * sit at full brightness for the length of this function. */
     m_invert = outputs == RCLIGHTS_OUTPUTS_ACTIVE_LOW ? kInvertAll : 0;
 
     for (uint8_t i = 0; i < RCL_CH_COUNT; i++) {
@@ -105,9 +98,7 @@ bool RcLights::begin(const RcLightsPins &pins, const rcl_config_t &cfg)
             continue;
         pinMode((uint8_t)pin, OUTPUT);
 #if RCLIGHTS_PWM_LEDC
-        /* One LEDC channel per output, numbered like the outputs. Eight bits,
-         * which is what the core produces; asking for more would only add
-         * resolution the brightness values do not carry. */
+        /* One LEDC channel per output, eight bits, as the core produces. */
         ledcSetup(i, m_pwmHz, 8);
         ledcAttachPin((uint8_t)pin, i);
 #endif
@@ -151,10 +142,8 @@ void RcLights::loop()
         uint16_t pulse = 0;
 
         if (inputPin(i) != RCLIGHTS_PIN_NONE) {
-            /* The capture fields are written from an interrupt and are wider
-             * than one byte on AVR, so they are read with interrupts off.
-             * noInterrupts()/interrupts() nest correctly on all three cores and
-             * the window here is a few instructions. */
+            /* Written from an interrupt and wider than a byte on AVR, so read
+             * with interrupts off. The window is a few instructions. */
             noInterrupts();
             fresh = m_cap[i].fresh;
             pulse = m_cap[i].pulse_us;
@@ -249,9 +238,7 @@ void RcLights::setInvertedOutputs(uint8_t mask)
     m_invert = mask;
     if (!m_running)
         return;
-    /* Rewrite every pin at once: half the outputs changing polarity at the next
-     * brightness change and the other half staying wrong would be worse than
-     * either. */
+    /* Rewrite every pin at once, so polarity never applies to only half. */
     for (uint8_t i = 0; i < RCL_OUT_COUNT; i++)
         writePin((rcl_output_t)i, m_written[i]);
 }
@@ -265,19 +252,15 @@ bool RcLights::captureCenter()
 {
     rcl_config_t cfg = m_state.cfg;
 
-    /* Steering and throttle only. Channel 3 is a switch: its rest position is
-     * whichever way it happens to be flicked, and taking that as a centre would
-     * put the centre on top of an endpoint. */
+    /* Steering and throttle only: a switch has no rest position. */
     for (uint8_t i = 0; i < RCL_CH_AUX; i++) {
         if (!m_state.chan_valid[i])
             return false;
         cfg.cal[i].center_us = m_pulse[i];
     }
 
-    /* applyConfig() rather than a direct assignment: it validates -- which
-     * catches a centre that has landed outside its own endpoints, what happens
-     * when this is called with a stick held over -- and it keeps the object's
-     * own fields in step with what is running. */
+    /* applyConfig() validates -- catching a centre outside its own endpoints,
+     * which is what a held stick produces -- and keeps the fields in step. */
     return applyConfig(cfg);
 }
 
@@ -351,8 +334,7 @@ void RcLights::onEdgeLevel(uint8_t idx, bool high)
         return;
     }
 
-    /* Unsigned subtraction, so the 32-bit micros() wrap every 71 minutes needs
-     * no handling: the difference across it is still correct. */
+    /* Unsigned, so the 71-minute micros() wrap needs no handling. */
     uint32_t width = now - m_cap[idx].rise_us;
     if (width < kPulseFloorUs || width > kPulseCeilUs)
         return;
@@ -389,12 +371,10 @@ void RcLights::isr2()
 
 /* --- input capture, per architecture ---------------------------------------
  *
- * Everything except AVR can attach an interrupt to any pin, so the generic path
- * is three attachInterrupt() calls. AVR cannot: an ATmega328P has exactly two
- * external interrupt pins, D2 and D3, and three channels do not fit on two
- * pins. The pin-change interrupts do cover every pin, at the cost of not
- * telling you which one changed, so the handler re-reads the channels on the
- * port that fired and compares against the level it saw last.
+ * Everything except AVR can attach an interrupt to any pin. An ATmega328P has
+ * two such pins and this needs three, so AVR uses pin-change interrupts, which
+ * do not say which pin changed: the handler re-reads the channels on the port
+ * that fired and compares against the level it saw last.
  */
 
 #if defined(ARDUINO_ARCH_AVR) && !defined(RCLIGHTS_NO_AVR_PCINT)
@@ -474,8 +454,8 @@ void RcLights::detachInputs()
         *pcmsk &= (uint8_t)~(1u << digitalPinToPCMSKbit((uint8_t)pin));
         SREG = sreg;
     }
-    /* PCICR is deliberately left alone: another library may be using the same
-     * port, and the mask above is what actually silences our pins. */
+    /* PCICR is left alone: another library may share the port, and the mask
+     * above is what silences our pins. */
 }
 
 #else /* every other core, and AVR with RCLIGHTS_NO_AVR_PCINT */
