@@ -15,6 +15,41 @@ All notable changes to this library, newest first. The format follows
 that and nothing else. The `version-matches-tag` CI job checks it against the tag
 and against `library.json` and the `Doxyfile`, which must agree.
 
+## Publishing to the Arduino Library Manager
+
+The registry indexes **tags**, and reads `library.properties` out of each one, so
+a release is published by tagging it and nothing else. Two rules follow from
+that, and both are enforced by CI before a tag can be made:
+
+- the `version` field must go up for every tag — the indexer rejects a tag whose
+  version equals one it has already indexed;
+- the tag has to be made from a commit whose `library.properties` is already
+  correct, because that file is what gets indexed, not the release notes.
+
+### Getting listed the first time
+
+1. The repository has to be public and on a host the registry accepts: GitHub,
+   GitLab or Bitbucket, with other hosts "considered on request". The
+   self-hosted instance this repository lives on is not one of them, so
+   publication needs a public mirror, and `url` in `library.properties` has to
+   point at that mirror — rule LP042 fails the submission if the URL is not
+   reachable.
+2. The `name` field must not already be in use in the index, case-insensitively.
+   This is the usual reason a submission is turned away. The `arduino-lint` CI
+   job checks it in `submit` mode (rule LP017), so it is answered here rather
+   than in the registry's pull request.
+3. Open a pull request against
+   [arduino/library-registry](https://github.com/arduino/library-registry)
+   adding the repository URL to `repositories.txt`. A bot validates it and
+   comments; on success the library appears in the index within a day.
+4. **Then change `LIBRARY_MANAGER_MODE` in `.gitlab-ci.yml` from `submit` to
+   `update`.** Left on `submit`, the job starts failing against the library's
+   own new index entry; the comment above that job explains what each mode
+   checks.
+
+The name cannot be changed after acceptance — it is the identifier by which the
+library is installed and by which other libraries depend on it.
+
 ## [Unreleased]
 
 Nothing yet.

@@ -139,22 +139,40 @@ version-matches-tag:
 # examples/<Name>/<Name>.ino rule -- precisely the three things that break
 # quietly and that you would otherwise hear about from a user first.
 #
-# --library-manager false, not update or submit: both of those modes check
-# against the central registry entry, which does not exist for this library --
-# it is deliberately not listed there. "update" presumes an *existing* entry and
-# fails hard without one (rule LP018, "Library name ... not found in the Library
-# Manager index"). "submit" would be the right choice once inclusion in the
-# registry is actually being sought; until then false claims nothing untrue and
-# still checks everything that holds regardless of registry status.
+# LIBRARY_MANAGER_MODE selects which of the Library Manager rules apply, and it
+# has to be changed once, by hand, at the moment the library is accepted into
+# the registry. The two modes check opposite things and each one fails if used
+# at the wrong time:
+#
+#   submit   The library is not in the index yet. Enables LP017, which fails if
+#            the name is already taken -- the single thing most likely to sink a
+#            submission, and better found here than in the registry's pull
+#            request. LP018 is disabled in this mode.
+#
+#   update   The library is in the index. Enables LP018, which fails if the name
+#            is *not* found -- so it catches a rename of an already-published
+#            library, which the registry does not allow because the name is the
+#            installation identifier. With --compliance strict it also promotes
+#            LP022 (latest Git tag greater than the version field) from warning
+#            to error, which catches tagging a release without bumping
+#            library.properties.
+#
+# Leaving it on submit after acceptance would fail on LP017 against this
+# library's own index entry.
+#
+# A third value, false, disables both and was what this job used while
+# publication was not being sought.
 arduino-lint:
   stage: lint
   image: debian:bookworm-slim
+  variables:
+    LIBRARY_MANAGER_MODE: submit
   before_script:
     - apt-get update -qq
     - apt-get install -y -qq --no-install-recommends curl ca-certificates
     - curl -fsSL https://raw.githubusercontent.com/arduino/arduino-lint/main/etc/install.sh | BINDIR=/usr/local/bin sh
   script:
-    - arduino-lint --compliance strict --library-manager false --recursive
+    - arduino-lint --compliance strict --library-manager "$LIBRARY_MANAGER_MODE" --recursive
 
 # --- test ---------------------------------------------------------------------
 

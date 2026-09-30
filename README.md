@@ -34,8 +34,20 @@ What it does, out of the box:
 Runs on an Arduino Nano, an ST Nucleo and an ESP32 DevKit from the same source.
 
 > **Status: 0.1.0, not verified on a car.** It compiles for all three targets
-> and passes 193 host checks. Nobody has driven it yet. See
+> and passes 289 host checks. Nobody has driven it yet. See
 > [CHANGELOG.md](CHANGELOG.md) for what that specifically means.
+
+## Installing
+
+Not in the Arduino Library Manager yet — see
+[CHANGELOG.md](CHANGELOG.md#publishing-to-the-arduino-library-manager) for what
+that takes. Until then:
+
+- **Arduino IDE**: download the repository as a ZIP and use *Sketch → Include
+  Library → Add .ZIP Library*.
+- **Anywhere else**: clone it into your sketchbook's `libraries/` folder.
+- **PlatformIO**: point `lib_deps` at the repository URL; `library.json` is in
+  the root.
 
 ## Getting started
 
